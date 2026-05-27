@@ -728,8 +728,8 @@ body::before {
 // IMPORTANTE: URL deve essere SOLO "https://XXXX.supabase.co"
 //             senza /rest/v1/ o altri path finali!
 // ============================================================
-const SUPABASE_URL = ' https://dmzozvidylvdaclzyeqk.supabase.co';   // es: https://abcdefgh.supabase.co
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtem96dmlkeWx2ZGFjbHp5ZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzgyODQsImV4cCI6MjA5NTQxNDI4NH0.dmdHfeoXrPHCpFzOMxoVo8TtTuj1M9KRPnOUWRMn2sE';                // chiave "anon public"
+const SUPABASE_URL = 'https://dmzozvidylvdaclzyeqk.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtem96dmlkeWx2ZGFjbHp5ZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzgyODQsImV4cCI6MjA5NTQxNDI4NH0.dmdHfeoXrPHCpFzOMxoVo8TtTuj1M9KRPnOUWRMn2sE';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -835,6 +835,7 @@ async function doRegister() {
   const city = document.getElementById('regCity').value.trim();
   const gender = document.getElementById('regGender').value;
   const orientation = document.getElementById('regOrientation').value;
+  const looking_for = document.getElementById('regLookingFor').value || 'entrambi';
   const bio = document.getElementById('regBio').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const pwd = document.getElementById('regPassword').value;
@@ -851,7 +852,7 @@ async function doRegister() {
 
   const { data, error } = await sb.auth.signUp({
     email, password: pwd,
-    options: { data: { name, age, city, gender, orientation, bio } }
+    options: { data: { name, age, city, gender, orientation, looking_for, bio } }
   });
 
   if (error) { btn.disabled = false; btn.textContent = 'Crea account →'; err.textContent = error.message; err.style.display = 'block'; return; }
@@ -886,7 +887,13 @@ async function doLogout() {
 // ============================================================
 async function loadProfile() {
   if (!currentUser) return;
-  const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  // Riprova fino a 5 volte (il trigger Supabase potrebbe tardare)
+  let data = null;
+  for (let i = 0; i < 5; i++) {
+    const res = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+    if (res.data) { data = res.data; break; }
+    await new Promise(r => setTimeout(r, 600));
+  }
   currentProfile = data;
   if (data) renderProfileScreen(data);
   await loadOnlineCount();
@@ -926,15 +933,40 @@ function previewAvatar(e) {
 // ============================================================
 async function setupOnlinePresence() {
   if (!currentUser) return;
-  await sb.from('profiles').update({ is_online: true, last_seen: new Date().toISOString() }).eq('id', currentUser.id);
 
-  onlineChannel = sb.channel('online-users')
-    .on('presence', { event: 'sync' }, () => loadOnlineCount())
-    .subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await onlineChannel.track({ user_id: currentUser.id });
+  // Imposta subito online nel DB
+  await sb.from('profiles')
+    .update({ is_online: true, last_seen: new Date().toISOString() })
+    .eq('id', currentUser.id);
+
+  // Rimuovi canale precedente se esiste
+  if (onlineChannel) { sb.removeChannel(onlineChannel); onlineChannel = null; }
+
+  // Heartbeat ogni 20s per mantenere is_online=true
+  if (!window._heartbeat) {
+    window._heartbeat = setInterval(async () => {
+      if (currentUser) {
+        await sb.from('profiles')
+          .update({ is_online: true, last_seen: new Date().toISOString() })
+          .eq('id', currentUser.id);
       }
-    });
+    }, 20000);
+  }
+
+  // Realtime: aggiorna il contatore quando i profili cambiano
+  onlineChannel = sb.channel('online-presence-' + currentUser.id)
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'profiles'
+    }, () => loadOnlineCount())
+    .subscribe();
+
+  // Aggiorna subito il contatore
+  await loadOnlineCount();
+
+  // Polling ogni 15s come fallback
+  if (!window._onlinePoller) {
+    window._onlinePoller = setInterval(loadOnlineCount, 15000);
+  }
 
   window.addEventListener('beforeunload', setOffline);
 }
@@ -945,11 +977,14 @@ async function setOffline() {
 }
 
 async function loadOnlineCount() {
-  const { count } = await sb.from('profiles')
-    .select('id', { count: 'exact' })
+  if (!currentUser) return;
+  const { count, error } = await sb.from('profiles')
+    .select('id', { count: 'exact', head: true })
     .eq('is_online', true)
-    .neq('id', currentUser?.id || '');
-  document.getElementById('onlineCount').textContent = (count || 0) + ' persone';
+    .neq('id', currentUser.id);
+  if (!error) {
+    document.getElementById('onlineCount').textContent = (count || 0);
+  }
 }
 
 // ============================================================
@@ -964,10 +999,17 @@ async function findMatch() {
   const el = document.getElementById('searchMsg');
   const interval = setInterval(() => { el.textContent = msgs[i % msgs.length]; i++; }, 900);
 
+  // Imposta di nuovo online prima di cercare (sicurezza)
+  await sb.from('profiles')
+    .update({ is_online: true, last_seen: new Date().toISOString() })
+    .eq('id', currentProfile.id);
+
   // Trova utenti online compatibili (escludi te stesso)
+  // Usa anche last_seen come fallback: attivi negli ultimi 2 minuti
+  const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
   const { data: candidates } = await sb.from('profiles')
     .select('*')
-    .eq('is_online', true)
+    .or(`is_online.eq.true,last_seen.gte.${twoMinsAgo}`)
     .neq('id', currentProfile.id)
     .limit(20);
 
