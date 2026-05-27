@@ -1108,6 +1108,10 @@ async function doRegister() {
 }
 
 async function doLogout() {
+  // Ferma heartbeat e poller
+  if (window._heartbeat) { clearInterval(window._heartbeat); window._heartbeat = null; }
+  if (window._onlinePoller) { clearInterval(window._onlinePoller); window._onlinePoller = null; }
+  document.removeEventListener('visibilitychange', handleVisibility);
   await setOffline();
   await sb.auth.signOut();
   currentUser = null; currentProfile = null;
@@ -1178,7 +1182,7 @@ function previewAvatar(e) {
 async function setupOnlinePresence() {
   if (!currentUser) return;
 
-  // Imposta subito online nel DB
+  // Imposta subito last_seen e is_online
   await sb.from('profiles')
     .update({ is_online: true, last_seen: new Date().toISOString() })
     .eq('id', currentUser.id);
@@ -1186,16 +1190,17 @@ async function setupOnlinePresence() {
   // Rimuovi canale precedente se esiste
   if (onlineChannel) { sb.removeChannel(onlineChannel); onlineChannel = null; }
 
-  // Heartbeat ogni 20s per mantenere is_online=true
-  if (!window._heartbeat) {
-    window._heartbeat = setInterval(async () => {
-      if (currentUser) {
-        await sb.from('profiles')
-          .update({ is_online: true, last_seen: new Date().toISOString() })
-          .eq('id', currentUser.id);
-      }
-    }, 20000);
-  }
+  // Heartbeat ogni 25s — aggiorna last_seen continuamente
+  // Se la tab viene chiusa, last_seen smette di aggiornarsi
+  // e dopo 60s l'utente non viene più contato come online
+  if (window._heartbeat) clearInterval(window._heartbeat);
+  window._heartbeat = setInterval(async () => {
+    if (currentUser) {
+      await sb.from('profiles')
+        .update({ is_online: true, last_seen: new Date().toISOString() })
+        .eq('id', currentUser.id);
+    }
+  }, 25000);
 
   // Realtime: aggiorna il contatore quando i profili cambiano
   onlineChannel = sb.channel('online-presence-' + currentUser.id)
@@ -1207,24 +1212,69 @@ async function setupOnlinePresence() {
   // Aggiorna subito il contatore
   await loadOnlineCount();
 
-  // Polling ogni 15s come fallback
-  if (!window._onlinePoller) {
-    window._onlinePoller = setInterval(loadOnlineCount, 15000);
-  }
+  // Polling ogni 20s — ricarica il contatore basato su last_seen
+  if (window._onlinePoller) clearInterval(window._onlinePoller);
+  window._onlinePoller = setInterval(loadOnlineCount, 20000);
 
+  // Tenta setOffline anche su beforeunload (funziona su desktop)
+  window.removeEventListener('beforeunload', setOffline);
   window.addEventListener('beforeunload', setOffline);
+
+  // Su mobile: usa visibilitychange — quando l'utente mette in background
+  document.removeEventListener('visibilitychange', handleVisibility);
+  document.addEventListener('visibilitychange', handleVisibility);
+}
+
+function handleVisibility() {
+  if (document.visibilityState === 'hidden') {
+    setOfflineSync(); // fire-and-forget sincrono
+  } else if (document.visibilityState === 'visible' && currentUser) {
+    // Torna in foreground: rimetti online
+    sb.from('profiles')
+      .update({ is_online: true, last_seen: new Date().toISOString() })
+      .eq('id', currentUser.id)
+      .then(() => loadOnlineCount());
+  }
+}
+
+function setOfflineSync() {
+  // Usa sendBeacon per garantire l'invio anche quando la tab si chiude
+  if (!currentUser) return;
+  const url = 'https://dmzozvidylvdaclzyeqk.supabase.co/rest/v1/profiles?id=eq.' + currentUser.id;
+  const body = JSON.stringify({ is_online: false, last_seen: new Date().toISOString() });
+  if (navigator.sendBeacon) {
+    const blob = new Blob([body], { type: 'application/json' });
+    // sendBeacon non supporta PATCH, usiamo fetch con keepalive
+  }
+  // keepalive fetch: funziona anche quando la pagina sta chiudendo
+  fetch('https://dmzozvidylvdaclzyeqk.supabase.co/rest/v1/profiles?id=eq.' + currentUser.id, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtem96dmlkeWx2ZGFjbHp5ZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzgyODQsImV4cCI6MjA5NTQxNDI4NH0.dmdHfeoXrPHCpFzOMxoVo8TtTuj1M9KRPnOUWRMn2sE',
+      'Authorization': 'Bearer ${SUPABASE_ANON_KEY}',
+      'Prefer': 'return=minimal'
+    },
+    body: body,
+    keepalive: true  // garantisce invio anche a tab chiusa
+  }).catch(() => {});
 }
 
 async function setOffline() {
   if (!currentUser) return;
-  await sb.from('profiles').update({ is_online: false, last_seen: new Date().toISOString() }).eq('id', currentUser.id);
+  await sb.from('profiles')
+    .update({ is_online: false, last_seen: new Date().toISOString() })
+    .eq('id', currentUser.id);
 }
 
 async function loadOnlineCount() {
   if (!currentUser) return;
+  // Conta utenti con last_seen negli ultimi 60 secondi
+  // Questo è molto più affidabile di is_online boolean
+  const threshold = new Date(Date.now() - 60 * 1000).toISOString();
   const { count, error } = await sb.from('profiles')
     .select('id', { count: 'exact', head: true })
-    .eq('is_online', true)
+    .gte('last_seen', threshold)
     .neq('id', currentUser.id);
   if (!error) {
     document.getElementById('onlineCount').textContent = (count || 0);
@@ -1249,10 +1299,11 @@ async function findMatch() {
     .eq('id', currentProfile.id);
 
   // Trova utenti online compatibili (escludi te stesso)
-  const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  // Considera online chi ha last_seen negli ultimi 60s
+  const oneMinAgo = new Date(Date.now() - 60 * 1000).toISOString();
   const { data: candidates } = await sb.from('profiles')
     .select('*')
-    .or(`is_online.eq.true,last_seen.gte.${twoMinsAgo}`)
+    .gte('last_seen', oneMinAgo)
     .neq('id', currentProfile.id)
     .limit(50);
 
