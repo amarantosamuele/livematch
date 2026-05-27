@@ -1135,17 +1135,13 @@ async function rejectMatch() {
 async function acceptMatch() {
   stopMatchTimer();
   if (currentMatch) {
-    await sb.from('match_requests').update({ status: 'accepted' }).eq('id', currentMatch.id);
+    await sb.from('match_requests')
+      .update({ status: 'accepted' })
+      .eq('id', currentMatch.id);
   }
   loadChatScreen();
   goTo('chat');
   subscribeToMessages();
-  await sb.from('messages').insert({
-    chat_id: currentMatch?.id,
-    sender_id: currentProfile.id,
-    content: '🎉 Match accettato! Iniziate a chattare.',
-    type: 'system'
-  });
 }
 
 // ============================================================
