@@ -463,11 +463,17 @@ body::before {
 
 /* ---- TOAST NOTIFICATION ---- */
 .toast-wrap {
-  position: absolute;
-  top: 48px; left: 12px; right: 12px;
-  z-index: 200;
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 370px;
+  z-index: 9999;
   display: flex; flex-direction: column; gap: 8px;
   pointer-events: none;
+}
+@media (max-width: 400px) {
+  .toast-wrap { width: calc(100vw - 20px); }
 }
 .toast {
   background: var(--surface);
@@ -572,6 +578,9 @@ body::before {
 </head>
 <body>
 
+<!-- TOAST CONTAINER (fuori dall'app per evitare overflow:hidden) -->
+<div id="toastWrap" class="toast-wrap"></div>
+
 <!-- LOADING -->
 <div id="loading">
   <div style="font-family:'DM Serif Display',serif;font-size:28px;">Live<span style="color:#ff4d6d;font-style:italic;">Match</span></div>
@@ -579,9 +588,6 @@ body::before {
 </div>
 
 <div id="app" style="display:none;">
-  <!-- TOAST NOTIFICATIONS -->
-  <div class="toast-wrap" id="toastWrap"></div>
-
   <div class="notch"></div>
   <div class="statusbar">
     <span id="clock">--:--</span>
@@ -1095,11 +1101,14 @@ function showToast({ profile, type, matchData }) {
     </div>
   `;
 
-  // Mostra con animazione
+  // Mostra con animazione - doppio rAF per garantire reflow
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       const t = document.getElementById('mainToast');
-      if (t) t.classList.add('show');
+      if (t) {
+        t.classList.add('show');
+        console.log('[LiveMatch] Toast shown:', type, 'for', profile.name);
+      }
     });
   });
 
@@ -1925,17 +1934,7 @@ async function requestPhoto() {
     to_user: matchedProfile.id
   }).select().single();
 
-  // Manda notifica realtime all'altro utente via broadcast
-  sb.channel('photo-req-' + matchedProfile.id).send({
-    type: 'broadcast',
-    event: 'photo-request',
-    payload: {
-      from_profile: currentProfile,
-      match_id: currentMatch.id,
-      match_data: currentMatch
-    }
-  });
-
+  // La notifica arriva automaticamente via postgres_changes su photo_requests
   document.getElementById('photoTitle').textContent = 'Stai chiedendo una foto a ' + matchedProfile.name;
   goTo('photo');
   startPhotoTimer();
@@ -2165,6 +2164,7 @@ async function subscribeToMatches() {
   // usando Supabase Realtime postgres_changes
   if (realtimeChannel) sb.removeChannel(realtimeChannel);
 
+  console.log('[LiveMatch] Subscribed to matches for', currentProfile.id);
   realtimeChannel = sb.channel('match-requests-incoming-' + currentProfile.id)
     .on('postgres_changes', {
       event: 'INSERT',
@@ -2215,21 +2215,31 @@ async function subscribeToMatches() {
     })
     .subscribe();
 
-  // Ascolta richieste foto dal vivo in arrivo
-  sb.channel('photo-req-' + currentProfile.id)
-    .on('broadcast', { event: 'photo-request' }, async (payload) => {
-      const { from_profile, match_data } = payload.payload;
-      if (!from_profile) return;
+  // Ascolta richieste foto dal vivo tramite postgres_changes (più affidabile)
+  sb.channel('photo-requests-incoming-' + currentProfile.id)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'photo_requests',
+      filter: 'to_user=eq.' + currentProfile.id
+    }, async (payload) => {
+      const req = payload.new;
+      // Carica profilo di chi ha chiesto la foto
+      const { data: fromProfile } = await sb.from('profiles')
+        .select('*').eq('id', req.from_user).single();
+      if (!fromProfile) return;
 
-      // Aggiorna stato corrente
-      if (!currentMatch) currentMatch = match_data;
-      if (!matchedProfile) matchedProfile = from_profile;
+      // Carica match associato
+      const { data: matchData } = await sb.from('match_requests')
+        .select('*').eq('id', req.match_id).single();
 
-      // Mostra toast foto
+      if (!currentMatch && matchData) currentMatch = matchData;
+      if (!matchedProfile) matchedProfile = fromProfile;
+
       showToast({
-        profile: from_profile,
+        profile: fromProfile,
         type: 'photo',
-        matchData: match_data
+        matchData: matchData || currentMatch
       });
     })
     .subscribe();
