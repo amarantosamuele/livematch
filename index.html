@@ -378,6 +378,88 @@ body::before {
 .nav-item.active{color:var(--accent);}
 .nav-item .icon{font-size:20px;}
 
+
+/* ---- CHAT LIST ---- */
+#s-chats .body{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+#s-chats .body::-webkit-scrollbar{width:3px}
+#s-chats .body::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
+.chats-header{padding:16px 20px 8px;flex-shrink:0;}
+.chats-title{font-family:'DM Serif Display',serif;font-size:22px;}
+.chats-sub{font-size:13px;color:var(--text2);margin-top:2px;}
+.chat-list{display:flex;flex-direction:column;flex:1;}
+.chat-list-item{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 20px;
+  border-bottom:0.5px solid var(--border);
+  cursor:pointer;transition:background 0.15s;
+}
+.chat-list-item:hover{background:var(--surface2);}
+.chat-list-av{
+  width:48px;height:48px;border-radius:50%;flex-shrink:0;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'DM Serif Display',serif;font-size:18px;color:#fff;
+  background:linear-gradient(135deg,#f77f8a,#e64b6b);
+  position:relative;
+}
+.chat-list-av img{width:100%;height:100%;object-fit:cover;}
+.chat-list-online{
+  position:absolute;bottom:1px;right:1px;
+  width:12px;height:12px;border-radius:50%;
+  background:var(--green);border:2px solid var(--surface);
+}
+.chat-list-info{flex:1;min-width:0;}
+.chat-list-name{font-size:14px;font-weight:500;color:var(--text);}
+.chat-list-preview{font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chat-list-time{font-size:11px;color:var(--text3);flex-shrink:0;}
+.chat-list-unread{
+  width:18px;height:18px;border-radius:50%;
+  background:var(--accent);color:#fff;
+  font-size:10px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.chats-empty{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:12px;padding:40px 24px;text-align:center;
+}
+.chats-empty .empty-icon{font-size:48px;opacity:0.4;}
+.chats-empty .empty-title{font-family:'DM Serif Display',serif;font-size:18px;color:var(--text2);}
+.chats-empty .empty-sub{font-size:13px;color:var(--text3);line-height:1.5;}
+.unread-badge{
+  min-width:18px;height:18px;border-radius:9px;
+  background:var(--accent);color:#fff;
+  font-size:10px;font-weight:600;padding:0 5px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+
+
+/* ---- TOGGLE SWITCH ---- */
+.toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface2);border:0.5px solid var(--border2);
+  border-radius:var(--r);padding:14px 16px;
+}
+.toggle-label{display:flex;flex-direction:column;gap:3px;}
+.toggle-label span{font-size:14px;font-weight:500;color:var(--text);}
+.toggle-label small{font-size:12px;color:var(--text2);}
+.toggle{position:relative;width:44px;height:24px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{
+  position:absolute;inset:0;
+  background:var(--surface3);border-radius:24px;
+  cursor:pointer;transition:background 0.2s;
+}
+.toggle-slider:before{
+  content:'';position:absolute;
+  width:18px;height:18px;border-radius:50%;
+  background:#fff;left:3px;top:3px;
+  transition:transform 0.2s;
+}
+.toggle input:checked + .toggle-slider{background:var(--accent);}
+.toggle input:checked + .toggle-slider:before{transform:translateX(20px);}
+
 /* ---- LOADING ---- */
 #loading{
   position:fixed;inset:0;background:var(--bg);
@@ -565,8 +647,9 @@ body::before {
       <button class="btn-ghost" onclick="goTo('profile')">Il mio profilo</button>
     </div>
     <div class="bottom-nav">
-      <div class="nav-item active" onclick="goTo('waiting')"><div class="icon">🏠</div>Home</div>
-      <div class="nav-item" onclick="goTo('profile')"><div class="icon">👤</div>Profilo</div>
+      <div class="nav-item active" onclick="navTo('waiting')"><div class="icon">🏠</div>Home</div>
+      <div class="nav-item" onclick="navTo('chats')"><div class="icon">💬</div>Chat</div>
+      <div class="nav-item" onclick="navTo('profile')"><div class="icon">👤</div>Profilo</div>
     </div>
   </div>
 
@@ -685,6 +768,34 @@ body::before {
     </div>
   </div>
 
+
+  <!-- ===== CHAT LIST ===== -->
+  <div class="screen" id="s-chats">
+    <div class="topbar">
+      <div class="logo">Live<span>Match</span></div>
+      <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+    </div>
+    <div class="body">
+      <div class="chats-header">
+        <div class="chats-title">Le tue chat</div>
+        <div class="chats-sub">Match accettati e conversazioni attive</div>
+      </div>
+      <div class="chat-list" id="chatList">
+        <div class="chats-empty">
+          <div class="empty-icon">💬</div>
+          <div class="empty-title">Nessuna chat ancora</div>
+          <div class="empty-sub">Fai un match live per iniziare a chattare!</div>
+          <button class="btn-primary" style="width:200px;margin-top:8px" onclick="goTo('waiting')">Cerca un match</button>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item" onclick="navTo('waiting')"><div class="icon">🏠</div>Home</div>
+      <div class="nav-item active" onclick="navTo('chats')"><div class="icon">💬</div>Chat</div>
+      <div class="nav-item" onclick="navTo('profile')"><div class="icon">👤</div>Profilo</div>
+    </div>
+  </div>
+
   <!-- ===== PROFILE ===== -->
   <div class="screen" id="s-profile">
     <div class="topbar" style="border-bottom:0.5px solid var(--border);">
@@ -711,11 +822,23 @@ body::before {
           <div class="stat-lbl">Chat avviate</div>
         </div>
       </div>
+      <!-- TOGGLE REMATCH -->
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span>🔄 Rivedi persone già incontrate</span>
+          <small>Potrai ricevere match da persone già viste</small>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggleRematch" onchange="saveRematchPref(this.checked)"/>
+          <div class="toggle-slider"></div>
+        </label>
+      </div>
       <button class="btn-ghost" onclick="doLogout()">Esci dall'account</button>
     </div>
     <div class="bottom-nav">
-      <div class="nav-item" onclick="goTo('waiting')"><div class="icon">🏠</div>Home</div>
-      <div class="nav-item active" onclick="goTo('profile')"><div class="icon">👤</div>Profilo</div>
+      <div class="nav-item" onclick="navTo('waiting')"><div class="icon">🏠</div>Home</div>
+      <div class="nav-item" onclick="navTo('chats')"><div class="icon">💬</div>Chat</div>
+      <div class="nav-item active" onclick="navTo('profile')"><div class="icon">👤</div>Profilo</div>
     </div>
   </div>
 
@@ -750,6 +873,115 @@ let realtimeChannel = null;
 let msgChannel = null;
 let onlineChannel = null;
 let avatarFileToUpload = null;
+
+
+// ============================================================
+// NAVIGATION WITH NAV BAR
+// ============================================================
+function navTo(screen) {
+  goTo(screen);
+  // Aggiorna nav attivo in tutte le bottom-nav
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.remove('active');
+  });
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const onclick = item.getAttribute('onclick') || '';
+    if (onclick.includes("'" + screen + "'")) item.classList.add('active');
+  });
+  if (screen === 'chats') loadChatList();
+}
+
+// ============================================================
+// CHAT LIST
+// ============================================================
+async function loadChatList() {
+  if (!currentProfile) return;
+  const list = document.getElementById('chatList');
+  list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">Caricamento…</div>';
+
+  // Carica tutti i match accettati
+  const { data: matches, error } = await sb.from('match_requests')
+    .select('*')
+    .or('from_user.eq.' + currentProfile.id + ',to_user.eq.' + currentProfile.id)
+    .eq('status', 'accepted')
+    .order('created_at', { ascending: false });
+
+  if (error || !matches || matches.length === 0) {
+    list.innerHTML = `
+      <div class="chats-empty">
+        <div class="empty-icon">💬</div>
+        <div class="empty-title">Nessuna chat ancora</div>
+        <div class="empty-sub">Fai un match live per iniziare a chattare!</div>
+        <button class="btn-primary" style="width:200px;margin-top:8px" onclick="navTo('waiting')">Cerca un match</button>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = '';
+
+  for (const match of matches) {
+    const otherId = match.from_user === currentProfile.id ? match.to_user : match.from_user;
+
+    // Carica profilo dell'altro utente
+    const { data: other } = await sb.from('profiles').select('*').eq('id', otherId).single();
+    if (!other) continue;
+
+    // Carica ultimo messaggio
+    const { data: lastMsgs } = await sb.from('messages')
+      .select('content, type, created_at')
+      .eq('chat_id', match.id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const lastMsg = lastMsgs && lastMsgs.length > 0 ? lastMsgs[0] : null;
+    const preview = lastMsg
+      ? (lastMsg.type === 'photo' ? '📸 Foto' : lastMsg.content)
+      : 'Nessun messaggio ancora';
+    const timeStr = lastMsg
+      ? formatTime(new Date(lastMsg.created_at))
+      : formatTime(new Date(match.created_at));
+
+    // Conta non letti (messaggi dopo last_seen - semplificato)
+    const item = document.createElement('div');
+    item.className = 'chat-list-item';
+    item.onclick = () => openChatFromList(match, other);
+
+    const avHtml = other.avatar_url
+      ? `<img src="${other.avatar_url}" alt="${other.name}"/>`
+      : other.name[0].toUpperCase();
+
+    const onlineDot = other.is_online
+      ? '<div class="chat-list-online"></div>'
+      : '';
+
+    item.innerHTML = `
+      <div class="chat-list-av">${avHtml}${onlineDot}</div>
+      <div class="chat-list-info">
+        <div class="chat-list-name">${other.name}, ${other.age}</div>
+        <div class="chat-list-preview">${preview}</div>
+      </div>
+      <div class="chat-list-time">${timeStr}</div>
+    `;
+    list.appendChild(item);
+  }
+}
+
+function formatTime(date) {
+  const now = new Date();
+  const diff = now - date;
+  if (diff < 60000) return 'ora';
+  if (diff < 3600000) return Math.floor(diff/60000) + 'm';
+  if (diff < 86400000) return Math.floor(diff/3600000) + 'h';
+  return date.getDate() + '/' + (date.getMonth()+1);
+}
+
+async function openChatFromList(match, other) {
+  currentMatch = match;
+  matchedProfile = other;
+  loadChatScreen();
+  goTo('chat');
+  subscribeToMessages();
+}
 
 // ============================================================
 // INIT
@@ -802,7 +1034,7 @@ function closePopup(id) {
 function goHome() {
   stopMatchTimer();
   stopPhotoTimer();
-  goTo('waiting');
+  navTo('waiting');
   subscribeToMatches();
 }
 
@@ -899,7 +1131,19 @@ async function loadProfile() {
   await loadOnlineCount();
 }
 
+function saveRematchPref(val) {
+  localStorage.setItem('livematch_rematch', val ? '1' : '0');
+}
+
+function loadRematchPref() {
+  const val = localStorage.getItem('livematch_rematch');
+  const toggle = document.getElementById('toggleRematch');
+  if (toggle) toggle.checked = val === '1';
+}
+
 function renderProfileScreen(p) {
+  // Carica preferenza rematch
+  loadRematchPref();
   const av = document.getElementById('profileBigAv');
   if (p.avatar_url) {
     av.innerHTML = `<img src="${p.avatar_url}" alt="${p.name}"/>`;
@@ -1005,13 +1249,12 @@ async function findMatch() {
     .eq('id', currentProfile.id);
 
   // Trova utenti online compatibili (escludi te stesso)
-  // Usa anche last_seen come fallback: attivi negli ultimi 2 minuti
   const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
   const { data: candidates } = await sb.from('profiles')
     .select('*')
     .or(`is_online.eq.true,last_seen.gte.${twoMinsAgo}`)
     .neq('id', currentProfile.id)
-    .limit(20);
+    .limit(50);
 
   clearInterval(interval);
 
@@ -1021,12 +1264,34 @@ async function findMatch() {
     return;
   }
 
-  // Filtra per compatibilità orientamento
-  const compatible = candidates.filter(c => isCompatible(currentProfile, c));
+  // Carica ID delle persone già incontrate (se toggle OFF)
+  let seenIds = new Set();
+  const allowRematch = document.getElementById('toggleRematch')?.checked || false;
+  if (!allowRematch) {
+    const { data: pastMatches } = await sb.from('match_requests')
+      .select('from_user, to_user')
+      .or(`from_user.eq.${currentProfile.id},to_user.eq.${currentProfile.id}`)
+      .in('status', ['accepted', 'rejected', 'expired']);
+    if (pastMatches) {
+      pastMatches.forEach(m => {
+        seenIds.add(m.from_user === currentProfile.id ? m.to_user : m.from_user);
+      });
+    }
+  }
+
+  // Filtra per compatibilità orientamento e persone già incontrate
+  const compatible = candidates.filter(c =>
+    isCompatible(currentProfile, c) && !seenIds.has(c.id)
+  );
 
   if (compatible.length === 0) {
-    el.textContent = 'Nessun match compatibile ora. Riprova!';
-    setTimeout(() => goTo('waiting'), 2500);
+    const allowRematch2 = document.getElementById('toggleRematch')?.checked || false;
+    if (!allowRematch2 && seenIds.size > 0 && candidates && candidates.length > 0) {
+      el.textContent = 'Hai già incontrato tutti! Attiva "Rivedi persone" dal profilo.';
+    } else {
+      el.textContent = 'Nessun match compatibile ora. Riprova tra poco!';
+    }
+    setTimeout(() => goTo('waiting'), 3000);
     return;
   }
 
@@ -1135,13 +1400,17 @@ async function rejectMatch() {
 async function acceptMatch() {
   stopMatchTimer();
   if (currentMatch) {
-    await sb.from('match_requests')
-      .update({ status: 'accepted' })
-      .eq('id', currentMatch.id);
+    await sb.from('match_requests').update({ status: 'accepted' }).eq('id', currentMatch.id);
   }
   loadChatScreen();
   goTo('chat');
   subscribeToMessages();
+  await sb.from('messages').insert({
+    chat_id: currentMatch?.id,
+    sender_id: currentProfile.id,
+    content: '🎉 Match accettato! Iniziate a chattare.',
+    type: 'system'
+  });
 }
 
 // ============================================================
