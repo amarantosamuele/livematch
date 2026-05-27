@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LiveMatch</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #13131a;
+  --surface2: #1c1c26;
+  --surface3: #252535;
+  --accent: #ff4d6d;
+  --accent2: #ff8fa3;
+  --green: #2dd4a0;
+  --blue: #4d9fff;
+  --text: #f0f0f8;
+  --text2: #9898b0;
+  --text3: #55556a;
+  --border: rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.12);
+  --r: 16px;
+  --r2: 24px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 600px 400px at 20% 50%, rgba(255,77,109,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 500px 400px at 80% 30%, rgba(77,159,255,0.05) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+#app {
+  width: 390px;
+  min-height: 780px;
+  background: var(--surface);
+  border-radius: 40px;
+  border: 0.5px solid var(--border2);
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 40px 120px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.notch {
+  width: 100px; height: 28px;
+  background: var(--bg);
+  border-radius: 0 0 20px 20px;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+.statusbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 20px;
+  font-size: 11px;
+  color: var(--text2);
+  flex-shrink: 0;
+}
+.screen { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+.screen.active { display: flex; animation: slideUp 0.28s ease; }
+@keyframes slideUp { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+/* ---- TOPBAR ---- */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px; flex-shrink: 0;
+}
+.logo { font-family: 'DM Serif Display', serif; font-size: 22px; }
+.logo span { color: var(--accent); font-style: italic; }
+.live-pill {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,77,109,0.15);
+  border: 0.5px solid rgba(255,77,109,0.3);
+  border-radius: 20px; padding: 4px 10px;
+  font-size: 11px; font-weight: 500; color: var(--accent2);
+}
+.live-dot { width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 1.2s infinite; }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* ---- FORMS ---- */
+.form-body { flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px; }
+.form-body::-webkit-scrollbar{width:3px}
+.form-body::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
+.form-title { font-family:'DM Serif Display',serif;font-size:26px;line-height:1.2;margin-bottom:4px; }
+.form-sub { font-size:13px;color:var(--text2); }
+.field { display:flex;flex-direction:column;gap:6px; }
+.field label { font-size:12px;color:var(--text2);font-weight:500;letter-spacing:0.3px; }
+.field input, .field textarea, .field select {
+  background: var(--surface2);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--r);
+  padding: 12px 16px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px; color: var(--text); outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color: rgba(255,77,109,0.5); }
+.field select option { background: var(--surface2); }
+.field textarea { resize: none; height: 80px; }
+.row2 { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+.btn-primary {
+  width:100%;padding:14px;border-radius:var(--r);
+  background:var(--accent);color:#fff;border:none;
+  font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;
+  cursor:pointer;transition:transform 0.1s,opacity 0.1s;letter-spacing:0.2px;
+}
+.btn-primary:hover{opacity:0.9}
+.btn-primary:active{transform:scale(0.98)}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed}
+.btn-ghost {
+  background:transparent;border:0.5px solid var(--border2);
+  border-radius:var(--r);padding:12px;
+  font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text2);
+  cursor:pointer;width:100%;transition:background 0.15s;
+}
+.btn-ghost:hover{background:var(--surface2)}
+.link-btn {
+  background:none;border:none;color:var(--accent2);font-size:13px;
+  cursor:pointer;text-decoration:underline;font-family:'DM Sans',sans-serif;
+}
+.error-msg { font-size:12px;color:var(--accent);padding:8px 12px;background:rgba(255,77,109,0.1);border-radius:8px; }
+.success-msg { font-size:12px;color:var(--green);padding:8px 12px;background:rgba(45,212,160,0.1);border-radius:8px; }
+
+/* ---- AVATAR UPLOAD ---- */
+.avatar-upload {
+  width:90px;height:90px;border-radius:50%;
+  background:var(--surface2);border:1.5px dashed var(--border2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;overflow:hidden;margin:0 auto;transition:border-color 0.2s;
+  font-size:28px;
+}
+.avatar-upload:hover{border-color:var(--accent)}
+.avatar-upload img{width:100%;height:100%;object-fit:cover;}
+#avatarInput{display:none}
+
+/* ---- WAITING ---- */
+#s-waiting .body {
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:20px;gap:20px;
+}
+.radar-wrap{position:relative;width:160px;height:160px;}
+.radar-ring{
+  position:absolute;border-radius:50%;border:1px solid var(--accent);
+  top:50%;left:50%;transform:translate(-50%,-50%);
+  animation:radar-expand 3s infinite;opacity:0;
+}
+.radar-ring:nth-child(2){animation-delay:1s}
+.radar-ring:nth-child(3){animation-delay:2s}
+@keyframes radar-expand{0%{width:50px;height:50px;opacity:0.7}100%{width:180px;height:180px;opacity:0}}
+.radar-center{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:54px;height:54px;border-radius:50%;
+  background:rgba(255,77,109,0.2);border:1px solid rgba(255,77,109,0.5);
+  display:flex;align-items:center;justify-content:center;font-size:24px;
+}
+.waiting-label{font-family:'DM Serif Display',serif;font-size:22px;text-align:center;line-height:1.3;}
+.waiting-sub{font-size:13px;color:var(--text2);text-align:center;}
+.online-badge{
+  background:var(--surface2);border:0.5px solid var(--border2);
+  border-radius:30px;padding:8px 20px;font-size:13px;color:var(--text2);
+}
+.online-badge strong{color:var(--green);}
+.user-avatar-sm {
+  width:36px;height:36px;border-radius:50%;object-fit:cover;
+  border:2px solid var(--surface);background:var(--surface3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:600;color:#fff;flex-shrink:0;
+  overflow:hidden;
+}
+
+/* ---- MATCH ---- */
+#s-match .body{flex:1;display:flex;flex-direction:column;padding:14px 18px;gap:12px;overflow:hidden;}
+.match-alert{
+  background:rgba(255,77,109,0.1);border:0.5px solid rgba(255,77,109,0.25);
+  border-radius:var(--r);padding:9px 14px;font-size:13px;color:var(--accent2);text-align:center;
+}
+.profile-card{
+  background:var(--surface2);border:0.5px solid var(--border2);
+  border-radius:var(--r2);padding:18px;
+  display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;
+}
+.big-avatar{
+  width:80px;height:80px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'DM Serif Display',serif;font-size:28px;color:#fff;
+  border:3px solid var(--surface);object-fit:cover;overflow:hidden;
+  background:linear-gradient(135deg,#f77f8a,#e64b6b);
+}
+.profile-name{font-family:'DM Serif Display',serif;font-size:20px;}
+.profile-meta{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;}
+.meta-pill{background:var(--surface3);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--text2);}
+.timer-wrap{position:absolute;top:14px;right:14px;}
+.actions-row{display:flex;gap:10px;}
+.btn-reject{
+  flex:1;padding:12px;border-radius:var(--r);
+  background:var(--surface2);border:0.5px solid rgba(255,77,109,0.4);
+  color:var(--accent2);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;
+}
+.btn-reject:hover{background:rgba(255,77,109,0.1)}
+.btn-accept{
+  flex:1;padding:12px;border-radius:var(--r);
+  background:var(--green);border:none;color:#0a1f17;
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;
+}
+.btn-accept:hover{opacity:0.9}
+.btn-photo{
+  width:100%;padding:11px;border-radius:var(--r);
+  background:transparent;border:0.5px solid var(--border2);
+  color:var(--blue);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;
+  transition:background 0.15s;
+}
+.btn-photo:hover{background:rgba(77,159,255,0.08)}
+
+/* ---- PHOTO ---- */
+#s-photo .body{flex:1;display:flex;flex-direction:column;padding:16px 20px;gap:14px;align-items:center;}
+.photo-title{font-family:'DM Serif Display',serif;font-size:19px;text-align:center;line-height:1.3;}
+.camera-frame{
+  width:220px;height:220px;border-radius:var(--r2);
+  background:var(--surface2);border:1.5px dashed var(--border2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  cursor:pointer;overflow:hidden;transition:border-color 0.2s,background 0.2s;
+}
+.camera-frame:hover{border-color:var(--blue);}
+.camera-frame.captured{border-color:var(--green);border-style:solid;background:rgba(45,212,160,0.06);}
+.camera-frame img{width:100%;height:100%;object-fit:cover;}
+.progress-wrap{width:100%;}
+.progress-header{display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:var(--text2);}
+.progress-header span:last-child{color:var(--accent);font-weight:500;}
+.progress-track{height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 1s linear;}
+#photoInput{display:none}
+
+/* ---- CHAT ---- */
+#s-chat{overflow:hidden;}
+.chat-topbar{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 18px;border-bottom:0.5px solid var(--border);flex-shrink:0;
+}
+.chat-av{
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'DM Serif Display',serif;font-size:14px;color:#fff;
+  background:linear-gradient(135deg,#f77f8a,#e64b6b);
+}
+.chat-av img{width:100%;height:100%;object-fit:cover;}
+.chat-info{flex:1;}
+.chat-name{font-size:14px;font-weight:500;}
+.chat-status{font-size:11px;color:var(--green);}
+.messages-area{
+  flex:1;overflow-y:auto;padding:14px 18px;
+  display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth;
+}
+.messages-area::-webkit-scrollbar{width:3px}
+.messages-area::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
+.sys-msg{text-align:center;font-size:11px;color:var(--text3);margin:4px 0;}
+.bubble-row{display:flex;align-items:flex-end;gap:7px;}
+.bubble-row.me{flex-direction:row-reverse;}
+.bubble-av-sm{
+  width:22px;height:22px;border-radius:50%;flex-shrink:0;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  font-size:8px;font-weight:600;color:#fff;
+  background:linear-gradient(135deg,#f77f8a,#e64b6b);
+}
+.bubble-av-sm img{width:100%;height:100%;object-fit:cover;}
+.bubble{
+  max-width:70%;padding:9px 13px;border-radius:18px;
+  font-size:13px;line-height:1.45;word-break:break-word;
+}
+.bubble.them{background:var(--surface2);color:var(--text);border-bottom-left-radius:4px;}
+.bubble.me{background:var(--accent);color:#fff;border-bottom-right-radius:4px;}
+.bubble-time{font-size:10px;opacity:0.55;margin-top:2px;text-align:right;}
+.bubble img{width:100%;border-radius:10px;margin-top:4px;}
+.typing-row{display:none;padding:0 18px 8px;align-items:center;gap:7px;}
+.typing-row.show{display:flex;}
+.typing-bubble{
+  background:var(--surface2);border-radius:18px;border-bottom-left-radius:4px;
+  padding:10px 14px;display:flex;gap:4px;align-items:center;
+}
+.typing-bubble span{
+  width:6px;height:6px;border-radius:50%;background:var(--text3);
+  animation:tdot 1.2s infinite;
+}
+.typing-bubble span:nth-child(2){animation-delay:0.2s}
+.typing-bubble span:nth-child(3){animation-delay:0.4s}
+@keyframes tdot{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+.input-row{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 14px;border-top:0.5px solid var(--border);flex-shrink:0;
+}
+.input-row input{
+  flex:1;background:var(--surface2);border:0.5px solid var(--border2);
+  border-radius:24px;padding:9px 15px;
+  font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;
+}
+.input-row input:focus{border-color:rgba(255,77,109,0.4);}
+.input-row input::placeholder{color:var(--text3);}
+.send-btn{
+  width:38px;height:38px;border-radius:50%;background:var(--accent);border:none;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  font-size:16px;flex-shrink:0;transition:transform 0.1s;
+}
+.send-btn:hover{transform:scale(1.05)}
+.send-btn:active{transform:scale(0.95)}
+.chat-photo-btn{
+  width:38px;height:38px;border-radius:50%;
+  background:var(--surface2);border:0.5px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  font-size:16px;flex-shrink:0;
+}
+#chatPhotoInput{display:none;}
+
+/* ---- POPUPS ---- */
+.popup-bg{
+  position:absolute;inset:0;background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(4px);display:none;
+  align-items:center;justify-content:center;z-index:100;
+}
+.popup-bg.show{display:flex;}
+.popup-card{
+  background:var(--surface);border:0.5px solid var(--border2);
+  border-radius:var(--r2);padding:26px 22px;width:280px;
+  text-align:center;display:flex;flex-direction:column;gap:12px;
+  animation:popIn 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes popIn{from{transform:scale(0.85);opacity:0}to{transform:scale(1);opacity:1}}
+.popup-emoji{font-size:40px;}
+.popup-title{font-family:'DM Serif Display',serif;font-size:19px;}
+.popup-sub{font-size:13px;color:var(--text2);line-height:1.5;}
+
+/* ---- PROFILE SCREEN ---- */
+#s-profile .body{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;}
+.profile-header{display:flex;align-items:center;gap:14px;}
+.profile-big-av{
+  width:70px;height:70px;border-radius:50%;overflow:hidden;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'DM Serif Display',serif;font-size:26px;color:#fff;
+  background:linear-gradient(135deg,#f77f8a,#e64b6b);
+}
+.profile-big-av img{width:100%;height:100%;object-fit:cover;}
+.profile-info-name{font-family:'DM Serif Display',serif;font-size:20px;}
+.profile-info-sub{font-size:13px;color:var(--text2);}
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.stat-card{
+  background:var(--surface2);border:0.5px solid var(--border2);
+  border-radius:var(--r);padding:14px;text-align:center;
+}
+.stat-num{font-family:'DM Serif Display',serif;font-size:28px;color:var(--accent);}
+.stat-lbl{font-size:11px;color:var(--text2);margin-top:2px;}
+
+/* ---- BOTTOM NAV ---- */
+.bottom-nav{
+  display:flex;align-items:center;justify-content:space-around;
+  padding:10px 16px;border-top:0.5px solid var(--border);flex-shrink:0;
+}
+.nav-item{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  cursor:pointer;padding:4px 8px;border-radius:10px;
+  transition:background 0.15s;font-size:10px;color:var(--text3);
+}
+.nav-item:hover{background:var(--surface2);}
+.nav-item.active{color:var(--accent);}
+.nav-item .icon{font-size:20px;}
+
+/* ---- LOADING ---- */
+#loading{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;z-index:999;
+}
+.spinner{
+  width:40px;height:40px;border:3px solid var(--surface3);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin 0.8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div style="font-family:'DM Serif Display',serif;font-size:28px;">Live<span style="color:#ff4d6d;font-style:italic;">Match</span></div>
+  <div class="spinner"></div>
+</div>
+
+<div id="app" style="display:none;">
+  <div class="notch"></div>
+  <div class="statusbar">
+    <span id="clock">--:--</span>
+    <span>●●● 🔋</span>
+  </div>
+
+  <!-- POPUP RIFIUTO -->
+  <div class="popup-bg" id="popupReject">
+    <div class="popup-card">
+      <div class="popup-emoji">👋</div>
+      <div class="popup-title">Match rifiutato</div>
+      <div class="popup-sub">Nessun problema! Sei tornato in coda.</div>
+      <button class="btn-primary" onclick="closePopup('popupReject');goHome()">Continua a cercare</button>
+    </div>
+  </div>
+
+  <!-- POPUP SCADUTO -->
+  <div class="popup-bg" id="popupExpired">
+    <div class="popup-card">
+      <div class="popup-emoji">⏰</div>
+      <div class="popup-title">Tempo scaduto!</div>
+      <div class="popup-sub">Il match è scaduto. Torna online per trovarne un altro!</div>
+      <button class="btn-primary" onclick="closePopup('popupExpired');goHome()">Riprova</button>
+    </div>
+  </div>
+
+  <!-- POPUP FOTO SCADUTA -->
+  <div class="popup-bg" id="popupPhotoExp">
+    <div class="popup-card">
+      <div class="popup-emoji">📸</div>
+      <div class="popup-title">Foto non inviata</div>
+      <div class="popup-sub">Il tempo per la foto è scaduto. Il match è andato perso.</div>
+      <button class="btn-primary" onclick="closePopup('popupPhotoExp');goHome()">Ok, riprova</button>
+    </div>
+  </div>
+
+  <!-- POPUP MATCH IN ARRIVO -->
+  <div class="popup-bg" id="popupIncomingMatch">
+    <div class="popup-card">
+      <div class="popup-emoji">💘</div>
+      <div class="popup-title">Match trovato!</div>
+      <div class="popup-sub"><span id="incomingMatchName">Qualcuno</span> vuole fare match con te. Hai 30 secondi!</div>
+      <button class="btn-primary" onclick="closePopup('popupIncomingMatch');goTo('match');startMatchTimer()">Vedi profilo</button>
+      <button class="btn-ghost" onclick="closePopup('popupIncomingMatch');rejectMatch()">Rifiuta</button>
+    </div>
+  </div>
+
+  <!-- ===== LOGIN ===== -->
+  <div class="screen active" id="s-auth">
+    <div class="topbar">
+      <div class="logo">Live<span>Match</span></div>
+    </div>
+    <div class="form-body">
+      <div class="form-title">Bentornato/a 👋</div>
+      <div class="form-sub">Accedi per trovare il tuo match live</div>
+      <div id="loginError" class="error-msg" style="display:none"></div>
+      <div class="field">
+        <label>EMAIL</label>
+        <input type="email" id="loginEmail" placeholder="nome@email.com"/>
+      </div>
+      <div class="field">
+        <label>PASSWORD</label>
+        <input type="password" id="loginPassword" placeholder="••••••••"/>
+      </div>
+      <button class="btn-primary" id="btnLogin" onclick="doLogin()">Accedi</button>
+      <div style="text-align:center;font-size:13px;color:var(--text2);">
+        Non hai un account? <button class="link-btn" onclick="goTo('register')">Registrati</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== REGISTER ===== -->
+  <div class="screen" id="s-register">
+    <div class="topbar">
+      <button onclick="goTo('login')" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
+      <div class="logo">Live<span>Match</span></div>
+      <div style="width:24px"></div>
+    </div>
+    <div class="form-body">
+      <div class="form-title">Crea il tuo profilo ✨</div>
+      <div class="form-sub">Ci vuole un minuto!</div>
+      <div id="regError" class="error-msg" style="display:none"></div>
+
+      <div class="field" style="align-items:center;">
+        <label>FOTO PROFILO</label>
+        <div class="avatar-upload" id="avatarPreview" onclick="document.getElementById('avatarInput').click()">
+          <span>📷</span>
+          <span style="font-size:11px;color:var(--text3)">Aggiungi</span>
+        </div>
+        <input type="file" id="avatarInput" accept="image/*" onchange="previewAvatar(event)"/>
+      </div>
+
+      <div class="field">
+        <label>NOME</label>
+        <input type="text" id="regName" placeholder="Il tuo nome"/>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>ETÀ</label>
+          <input type="number" id="regAge" placeholder="25" min="18" max="99"/>
+        </div>
+        <div class="field">
+          <label>CITTÀ</label>
+          <input type="text" id="regCity" placeholder="Milano"/>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>GENERE</label>
+          <select id="regGender">
+            <option value="">Seleziona</option>
+            <option value="uomo">Uomo</option>
+            <option value="donna">Donna</option>
+            <option value="altro">Altro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>ORIENTAMENTO</label>
+          <select id="regOrientation">
+            <option value="">Seleziona</option>
+            <option value="eterosessuale">Eterosessuale</option>
+            <option value="omosessuale">Omosessuale</option>
+            <option value="bisessuale">Bisessuale</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>BIO</label>
+        <textarea id="regBio" placeholder="Raccontati in poche parole…"></textarea>
+      </div>
+      <div class="field">
+        <label>EMAIL</label>
+        <input type="email" id="regEmail" placeholder="nome@email.com"/>
+      </div>
+      <div class="field">
+        <label>PASSWORD</label>
+        <input type="password" id="regPassword" placeholder="Minimo 6 caratteri"/>
+      </div>
+      <button class="btn-primary" id="btnRegister" onclick="doRegister()">Crea account →</button>
+    </div>
+  </div>
+
+  <!-- ===== WAITING / HOME ===== -->
+  <div class="screen" id="s-waiting">
+    <div class="topbar">
+      <div class="logo">Live<span>Match</span></div>
+      <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+    </div>
+    <div class="body">
+      <div class="radar-wrap">
+        <div class="radar-ring"></div>
+        <div class="radar-ring"></div>
+        <div class="radar-ring"></div>
+        <div class="radar-center">❤️</div>
+      </div>
+      <div class="waiting-label">Sei online e<br/>pronto/a a matchare</div>
+      <div class="waiting-sub">Solo persone attive adesso</div>
+      <div class="online-badge"><strong id="onlineCount">…</strong> persone online ora</div>
+      <button class="btn-primary" id="btnMatch" onclick="findMatch()" style="margin-top:4px">
+        🔍 Cerca un match live
+      </button>
+      <button class="btn-ghost" onclick="goTo('profile')">Il mio profilo</button>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item active" onclick="goTo('waiting')"><div class="icon">🏠</div>Home</div>
+      <div class="nav-item" onclick="goTo('profile')"><div class="icon">👤</div>Profilo</div>
+    </div>
+  </div>
+
+  <!-- ===== SEARCHING ===== -->
+  <div class="screen" id="s-searching">
+    <div class="topbar">
+      <div class="logo">Live<span>Match</span></div>
+      <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;">
+      <div class="radar-wrap">
+        <div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-ring"></div>
+        <div class="radar-center">🔍</div>
+      </div>
+      <div class="waiting-label">Ricerca in corso…</div>
+      <div class="waiting-sub" id="searchMsg">Cercando tra gli utenti online…</div>
+      <button class="btn-ghost" style="width:200px" onclick="cancelSearch()">Annulla</button>
+    </div>
+  </div>
+
+  <!-- ===== MATCH FOUND ===== -->
+  <div class="screen" id="s-match">
+    <div class="topbar">
+      <div class="logo">Live<span>Match</span></div>
+      <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+    </div>
+    <div class="body">
+      <div class="match-alert">🎉 Match trovato! Hai 30 secondi per rispondere</div>
+      <div class="profile-card">
+        <div class="timer-wrap">
+          <svg width="60" height="60" viewBox="0 0 60 60">
+            <circle cx="30" cy="30" r="25" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="4"/>
+            <circle id="tc" cx="30" cy="30" r="25" fill="none" stroke="#ff4d6d" stroke-width="4"
+              stroke-dasharray="157" stroke-dashoffset="0" stroke-linecap="round"
+              transform="rotate(-90 30 30)" style="transition:stroke-dashoffset 1s linear;"/>
+            <text id="tTxt" x="30" y="35" text-anchor="middle" font-size="14" fill="#f0f0f8" font-family="DM Sans">30</text>
+          </svg>
+        </div>
+        <div class="big-avatar" id="matchAv"></div>
+        <div class="profile-name" id="matchName">—</div>
+        <div class="profile-meta">
+          <div class="meta-pill" id="matchAge">—</div>
+          <div class="meta-pill" id="matchCity">—</div>
+          <div class="meta-pill" style="color:var(--green)">● Online ora</div>
+        </div>
+        <div style="font-size:13px;color:var(--text2);text-align:center;line-height:1.5;" id="matchBio"></div>
+      </div>
+      <div class="actions-row">
+        <button class="btn-reject" onclick="rejectMatch()">✕ Rifiuta</button>
+        <button class="btn-accept" onclick="acceptMatch()">✓ Accetta</button>
+      </div>
+      <button class="btn-photo" onclick="requestPhoto()">📸 Chiedi una foto dal vivo</button>
+      <div style="font-size:11px;color:var(--text3);text-align:center;">Il match scade automaticamente in 30s</div>
+    </div>
+  </div>
+
+  <!-- ===== PHOTO REQUEST ===== -->
+  <div class="screen" id="s-photo">
+    <div class="topbar" style="border-bottom:0.5px solid var(--border);">
+      <button onclick="goTo('match')" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
+      <div style="font-size:14px;font-weight:500;">Foto dal vivo</div>
+      <div style="width:24px"></div>
+    </div>
+    <div class="body">
+      <div class="photo-title" id="photoTitle">Scatta una foto dal vivo</div>
+      <div style="font-size:13px;color:var(--text2);text-align:center;">
+        Scatta una foto adesso per verificare che sei reale 🙂
+      </div>
+      <div class="camera-frame" id="cameraFrame" onclick="document.getElementById('photoInput').click()">
+        <div id="camDefault" style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+          <div style="font-size:48px;">📷</div>
+          <div style="font-size:13px;color:var(--text2);">Tocca per scattare</div>
+        </div>
+        <img id="photoPreview" src="" style="display:none;width:100%;height:100%;object-fit:cover;"/>
+      </div>
+      <input type="file" id="photoInput" accept="image/*" capture="user" onchange="handlePhotoCapture(event)"/>
+      <div class="progress-wrap">
+        <div class="progress-header">
+          <span>Tempo rimasto</span>
+          <span id="photoTimerTxt">60s</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="photoFill" style="width:100%"></div>
+        </div>
+      </div>
+      <button class="btn-primary" id="btnSendPhoto" style="display:none" onclick="sendLivePhoto()">
+        Invia foto e vai alla chat →
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== CHAT ===== -->
+  <div class="screen" id="s-chat">
+    <div class="chat-topbar">
+      <button onclick="leaveChat()" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:0 4px;">←</button>
+      <div class="chat-av" id="chatAv"></div>
+      <div class="chat-info">
+        <div class="chat-name" id="chatName">—</div>
+        <div class="chat-status">● Online ora</div>
+      </div>
+    </div>
+    <div class="messages-area" id="messages">
+      <div class="sys-msg" id="chatSysMsg">Match live!</div>
+    </div>
+    <div class="typing-row" id="typingRow">
+      <div class="bubble-av-sm" id="typingAv"></div>
+      <div class="typing-bubble">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+    <div class="input-row">
+      <div class="chat-photo-btn" onclick="document.getElementById('chatPhotoInput').click()">📸</div>
+      <input type="file" id="chatPhotoInput" accept="image/*" onchange="sendPhotoMessage(event)"/>
+      <input type="text" id="chatInput" placeholder="Scrivi un messaggio…" onkeydown="if(event.key==='Enter')sendMessage()"/>
+      <button class="send-btn" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+
+  <!-- ===== PROFILE ===== -->
+  <div class="screen" id="s-profile">
+    <div class="topbar" style="border-bottom:0.5px solid var(--border);">
+      <button onclick="goTo('waiting')" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
+      <div style="font-size:14px;font-weight:500;">Il mio profilo</div>
+      <div style="width:24px"></div>
+    </div>
+    <div class="body">
+      <div class="profile-header">
+        <div class="profile-big-av" id="profileBigAv"></div>
+        <div>
+          <div class="profile-info-name" id="profileName">—</div>
+          <div class="profile-info-sub" id="profileMeta">—</div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text2);font-style:italic;line-height:1.5;" id="profileBio"></div>
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="stat-num" id="statMatches">0</div>
+          <div class="stat-lbl">Match totali</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="statChats">0</div>
+          <div class="stat-lbl">Chat avviate</div>
+        </div>
+      </div>
+      <button class="btn-ghost" onclick="doLogout()">Esci dall'account</button>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item" onclick="goTo('waiting')"><div class="icon">🏠</div>Home</div>
+      <div class="nav-item active" onclick="goTo('profile')"><div class="icon">👤</div>Profilo</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// CONFIGURAZIONE SUPABASE
+// ⚠️ Sostituisci con le tue credenziali da supabase.com → Settings → API
+// IMPORTANTE: URL deve essere SOLO "https://XXXX.supabase.co"
+//             senza /rest/v1/ o altri path finali!
+// ============================================================
+const SUPABASE_URL = 'https://TUOPROJECT.supabase.co';   // es: https://abcdefgh.supabase.co
+const SUPABASE_ANON_KEY = 'TUA_ANON_KEY';                // chiave "anon public"
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============================================================
+// STATE
+// ============================================================
+let currentUser = null;
+let currentProfile = null;
+let currentMatch = null;
+let matchedProfile = null;
+let matchTimer = null;
+let photoTimer = null;
+let photoSecs = 60;
+let matchSecs = 30;
+let photoCapturedFile = null;
+let realtimeChannel = null;
+let msgChannel = null;
+let onlineChannel = null;
+let avatarFileToUpload = null;
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  updateClock();
+  setInterval(updateClock, 10000);
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    await loadProfile();
+    goTo('waiting');
+    setupOnlinePresence();
+    subscribeToMatches();
+  } else {
+    goTo('auth');
+  }
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  sb.auth.onAuthStateChange(async (_event, session) => {
+    if (session && !currentUser) {
+      currentUser = session.user;
+      await loadProfile();
+      goTo('waiting');
+      setupOnlinePresence();
+    }
+  });
+}
+
+function updateClock() {
+  const n = new Date();
+  document.getElementById('clock').textContent =
+    String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function goTo(screen) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('s-' + screen).classList.add('active');
+}
+
+function closePopup(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+function goHome() {
+  stopMatchTimer();
+  stopPhotoTimer();
+  goTo('waiting');
+  subscribeToMatches();
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd = document.getElementById('loginPassword').value;
+  const btn = document.getElementById('btnLogin');
+  const err = document.getElementById('loginError');
+  err.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Accesso…';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pwd });
+  btn.disabled = false;
+  btn.textContent = 'Accedi';
+  if (error) { err.textContent = error.message; err.style.display = 'block'; return; }
+  currentUser = data.user;
+  await loadProfile();
+  setupOnlinePresence();
+  subscribeToMatches();
+  goTo('waiting');
+}
+
+async function doRegister() {
+  const name = document.getElementById('regName').value.trim();
+  const age = parseInt(document.getElementById('regAge').value);
+  const city = document.getElementById('regCity').value.trim();
+  const gender = document.getElementById('regGender').value;
+  const orientation = document.getElementById('regOrientation').value;
+  const bio = document.getElementById('regBio').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const pwd = document.getElementById('regPassword').value;
+  const btn = document.getElementById('btnRegister');
+  const err = document.getElementById('regError');
+  err.style.display = 'none';
+
+  if (!name || !age || !city || !gender || !orientation || !email || !pwd) {
+    err.textContent = 'Compila tutti i campi obbligatori.'; err.style.display = 'block'; return;
+  }
+  if (age < 18) { err.textContent = 'Devi avere almeno 18 anni.'; err.style.display = 'block'; return; }
+
+  btn.disabled = true; btn.textContent = 'Creazione…';
+
+  const { data, error } = await sb.auth.signUp({
+    email, password: pwd,
+    options: { data: { name, age, city, gender, orientation, bio } }
+  });
+
+  if (error) { btn.disabled = false; btn.textContent = 'Crea account →'; err.textContent = error.message; err.style.display = 'block'; return; }
+
+  currentUser = data.user;
+
+  // Upload avatar se presente
+  if (avatarFileToUpload && currentUser) {
+    const ext = avatarFileToUpload.name.split('.').pop();
+    const path = `${currentUser.id}/avatar.${ext}`;
+    await sb.storage.from('avatars').upload(path, avatarFileToUpload, { upsert: true });
+    const { data: urlData } = sb.storage.from('avatars').getPublicUrl(path);
+    await sb.from('profiles').update({ avatar_url: urlData.publicUrl }).eq('id', currentUser.id);
+  }
+
+  await loadProfile();
+  setupOnlinePresence();
+  subscribeToMatches();
+  btn.disabled = false; btn.textContent = 'Crea account →';
+  goTo('waiting');
+}
+
+async function doLogout() {
+  await setOffline();
+  await sb.auth.signOut();
+  currentUser = null; currentProfile = null;
+  goTo('auth');
+}
+
+// ============================================================
+// PROFILE
+// ============================================================
+async function loadProfile() {
+  if (!currentUser) return;
+  const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  currentProfile = data;
+  if (data) renderProfileScreen(data);
+  await loadOnlineCount();
+}
+
+function renderProfileScreen(p) {
+  const av = document.getElementById('profileBigAv');
+  if (p.avatar_url) {
+    av.innerHTML = `<img src="${p.avatar_url}" alt="${p.name}"/>`;
+  } else {
+    av.textContent = p.name[0].toUpperCase();
+  }
+  document.getElementById('profileName').textContent = p.name + ', ' + p.age;
+  document.getElementById('profileMeta').textContent = p.city + ' · ' + p.orientation;
+  document.getElementById('profileBio').textContent = p.bio || 'Nessuna bio ancora.';
+
+  // stats
+  sb.from('match_requests').select('id', {count:'exact'})
+    .or(`from_user.eq.${p.id},to_user.eq.${p.id}`)
+    .then(({count}) => document.getElementById('statMatches').textContent = count || 0);
+  sb.from('match_requests').select('id', {count:'exact'})
+    .or(`from_user.eq.${p.id},to_user.eq.${p.id}`)
+    .eq('status','accepted')
+    .then(({count}) => document.getElementById('statChats').textContent = count || 0);
+}
+
+function previewAvatar(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  avatarFileToUpload = file;
+  const url = URL.createObjectURL(file);
+  document.getElementById('avatarPreview').innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`;
+}
+
+// ============================================================
+// ONLINE PRESENCE
+// ============================================================
+async function setupOnlinePresence() {
+  if (!currentUser) return;
+  await sb.from('profiles').update({ is_online: true, last_seen: new Date().toISOString() }).eq('id', currentUser.id);
+
+  onlineChannel = sb.channel('online-users')
+    .on('presence', { event: 'sync' }, () => loadOnlineCount())
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await onlineChannel.track({ user_id: currentUser.id });
+      }
+    });
+
+  window.addEventListener('beforeunload', setOffline);
+}
+
+async function setOffline() {
+  if (!currentUser) return;
+  await sb.from('profiles').update({ is_online: false, last_seen: new Date().toISOString() }).eq('id', currentUser.id);
+}
+
+async function loadOnlineCount() {
+  const { count } = await sb.from('profiles')
+    .select('id', { count: 'exact' })
+    .eq('is_online', true)
+    .neq('id', currentUser?.id || '');
+  document.getElementById('onlineCount').textContent = (count || 0) + ' persone';
+}
+
+// ============================================================
+// MATCHING
+// ============================================================
+async function findMatch() {
+  if (!currentProfile) return;
+  goTo('searching');
+
+  const msgs = ['Cercando utenti online…','Scansione in corso…','Trovando qualcuno compatibile…','Quasi lì…'];
+  let i = 0;
+  const el = document.getElementById('searchMsg');
+  const interval = setInterval(() => { el.textContent = msgs[i % msgs.length]; i++; }, 900);
+
+  // Trova utenti online compatibili (escludi te stesso)
+  const { data: candidates } = await sb.from('profiles')
+    .select('*')
+    .eq('is_online', true)
+    .neq('id', currentProfile.id)
+    .limit(20);
+
+  clearInterval(interval);
+
+  if (!candidates || candidates.length === 0) {
+    el.textContent = 'Nessun utente online in questo momento…';
+    setTimeout(() => goTo('waiting'), 2500);
+    return;
+  }
+
+  // Filtra per compatibilità orientamento
+  const compatible = candidates.filter(c => isCompatible(currentProfile, c));
+
+  if (compatible.length === 0) {
+    el.textContent = 'Nessun match compatibile ora. Riprova!';
+    setTimeout(() => goTo('waiting'), 2500);
+    return;
+  }
+
+  // Scegli uno random
+  const partner = compatible[Math.floor(Math.random() * compatible.length)];
+  matchedProfile = partner;
+
+  // Crea il match nel DB
+  const { data: match, error } = await sb.from('match_requests').insert({
+    from_user: currentProfile.id,
+    to_user: partner.id,
+    status: 'pending'
+  }).select().single();
+
+  if (error) {
+    // Match già esiste, carica quello
+    const { data: existing } = await sb.from('match_requests')
+      .select('*').eq('from_user', currentProfile.id).eq('to_user', partner.id).single();
+    currentMatch = existing;
+  } else {
+    currentMatch = match;
+  }
+
+  renderMatchScreen(partner);
+  goTo('match');
+  startMatchTimer();
+
+  // Notifica real-time all'altro utente
+  sb.channel('match-' + partner.id).send({
+    type: 'broadcast', event: 'new-match',
+    payload: { match_id: currentMatch.id, from: currentProfile }
+  });
+}
+
+function isCompatible(me, other) {
+  if (me.orientation === 'eterosessuale') {
+    return me.gender !== other.gender;
+  } else if (me.orientation === 'omosessuale') {
+    return me.gender === other.gender;
+  }
+  return true; // bisessuale: tutti
+}
+
+function renderMatchScreen(p) {
+  const av = document.getElementById('matchAv');
+  if (p.avatar_url) {
+    av.innerHTML = `<img src="${p.avatar_url}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`;
+  } else {
+    av.textContent = p.name[0].toUpperCase();
+  }
+  document.getElementById('matchName').textContent = p.name + ', ' + p.age;
+  document.getElementById('matchAge').textContent = p.age + ' anni';
+  document.getElementById('matchCity').textContent = p.city;
+  document.getElementById('matchBio').textContent = p.bio || '';
+}
+
+function cancelSearch() {
+  goTo('waiting');
+}
+
+// ============================================================
+// MATCH TIMER
+// ============================================================
+function startMatchTimer() {
+  stopMatchTimer();
+  matchSecs = 30;
+  updateTimerUI(30, 30);
+  matchTimer = setInterval(() => {
+    matchSecs--;
+    updateTimerUI(matchSecs, 30);
+    if (matchSecs <= 0) {
+      stopMatchTimer();
+      expireMatch();
+    }
+  }, 1000);
+}
+
+function stopMatchTimer() {
+  if (matchTimer) { clearInterval(matchTimer); matchTimer = null; }
+}
+
+function updateTimerUI(t, max) {
+  const circ = document.getElementById('tc');
+  const txt = document.getElementById('tTxt');
+  if (!circ) return;
+  circ.style.strokeDashoffset = 157 * (1 - t/max);
+  txt.textContent = t;
+  circ.style.stroke = t > 10 ? '#ff4d6d' : '#ff8c00';
+}
+
+async function expireMatch() {
+  if (currentMatch) {
+    await sb.from('match_requests').update({ status: 'expired' }).eq('id', currentMatch.id);
+  }
+  document.getElementById('popupExpired').classList.add('show');
+}
+
+async function rejectMatch() {
+  stopMatchTimer();
+  if (currentMatch) {
+    await sb.from('match_requests').update({ status: 'rejected' }).eq('id', currentMatch.id);
+  }
+  document.getElementById('popupReject').classList.add('show');
+}
+
+async function acceptMatch() {
+  stopMatchTimer();
+  if (currentMatch) {
+    await sb.from('match_requests').update({ status: 'accepted' }).eq('id', currentMatch.id);
+  }
+  loadChatScreen();
+  goTo('chat');
+  subscribeToMessages();
+  await sb.from('messages').insert({
+    chat_id: currentMatch?.id,
+    sender_id: currentProfile.id,
+    content: '🎉 Match accettato! Iniziate a chattare.',
+    type: 'system'
+  });
+}
+
+// ============================================================
+// PHOTO REQUEST
+// ============================================================
+async function requestPhoto() {
+  if (!currentMatch || !matchedProfile) return;
+  stopMatchTimer();
+
+  // Crea photo request nel DB
+  await sb.from('photo_requests').insert({
+    match_id: currentMatch.id,
+    from_user: currentProfile.id,
+    to_user: matchedProfile.id
+  });
+
+  document.getElementById('photoTitle').textContent = matchedProfile.name + ' ti ha chiesto\nuna foto dal vivo';
+  goTo('photo');
+  startPhotoTimer();
+}
+
+function startPhotoTimer() {
+  stopPhotoTimer();
+  photoCapturedFile = null;
+  photoSecs = 60;
+  document.getElementById('cameraFrame').classList.remove('captured');
+  document.getElementById('camDefault').style.display = 'flex';
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('btnSendPhoto').style.display = 'none';
+  document.getElementById('photoFill').style.width = '100%';
+  document.getElementById('photoTimerTxt').textContent = '60s';
+
+  photoTimer = setInterval(() => {
+    photoSecs--;
+    const pct = photoSecs / 60 * 100;
+    document.getElementById('photoFill').style.width = pct + '%';
+    document.getElementById('photoTimerTxt').textContent = photoSecs + 's';
+    if (photoSecs <= 10) document.getElementById('photoFill').style.background = '#ff4d6d';
+    if (photoSecs <= 0) {
+      stopPhotoTimer();
+      if (!photoCapturedFile) {
+        document.getElementById('popupPhotoExp').classList.add('show');
+      }
+    }
+  }, 1000);
+}
+
+function stopPhotoTimer() {
+  if (photoTimer) { clearInterval(photoTimer); photoTimer = null; }
+}
+
+function handlePhotoCapture(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  photoCapturedFile = file;
+  const url = URL.createObjectURL(file);
+  document.getElementById('camDefault').style.display = 'none';
+  const preview = document.getElementById('photoPreview');
+  preview.src = url;
+  preview.style.display = 'block';
+  document.getElementById('cameraFrame').classList.add('captured');
+  document.getElementById('btnSendPhoto').style.display = 'block';
+}
+
+async function sendLivePhoto() {
+  stopPhotoTimer();
+  if (!photoCapturedFile || !currentMatch) { loadChatScreen(); goTo('chat'); subscribeToMessages(); return; }
+
+  const ext = photoCapturedFile.name.split('.').pop() || 'jpg';
+  const path = `${currentMatch.id}/${currentProfile.id}-${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from('live-photos').upload(path, photoCapturedFile);
+
+  if (!error) {
+    const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
+    await sb.from('messages').insert({
+      chat_id: currentMatch.id,
+      sender_id: currentProfile.id,
+      content: urlData.publicUrl,
+      type: 'photo'
+    });
+  }
+
+  loadChatScreen();
+  goTo('chat');
+  subscribeToMessages();
+}
+
+// ============================================================
+// CHAT
+// ============================================================
+function loadChatScreen() {
+  if (!matchedProfile) return;
+  const av = document.getElementById('chatAv');
+  if (matchedProfile.avatar_url) {
+    av.innerHTML = `<img src="${matchedProfile.avatar_url}" alt="${matchedProfile.name}" style="width:100%;height:100%;object-fit:cover;"/>`;
+  } else {
+    av.textContent = matchedProfile.name[0].toUpperCase();
+  }
+  document.getElementById('chatName').textContent = matchedProfile.name + ', ' + matchedProfile.age;
+  document.getElementById('chatSysMsg').textContent = 'Match live con ' + matchedProfile.name + '!';
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  const sys = document.createElement('div');
+  sys.className = 'sys-msg';
+  sys.textContent = 'Oggi · Match live con ' + matchedProfile.name + '!';
+  msgs.appendChild(sys);
+}
+
+async function subscribeToMessages() {
+  if (msgChannel) sb.removeChannel(msgChannel);
+  if (!currentMatch) return;
+
+  // Prima crea o recupera la chat row
+  let chatId = currentMatch.id; // usiamo match_id come chat_id per semplicità
+
+  // Carica messaggi esistenti
+  const { data: existing } = await sb.from('messages')
+    .select('*, sender:profiles(name, avatar_url, avatar_color)')
+    .eq('chat_id', chatId)
+    .order('created_at', { ascending: true });
+
+  if (existing) existing.forEach(m => renderMessage(m));
+
+  // Realtime
+  msgChannel = sb.channel('messages-' + chatId)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'messages',
+      filter: `chat_id=eq.${chatId}`
+    }, async (payload) => {
+      const msg = payload.new;
+      if (msg.sender_id === currentProfile.id) return;
+      const { data: sender } = await sb.from('profiles').select('name,avatar_url,avatar_color').eq('id', msg.sender_id).single();
+      msg.sender = sender;
+      hideTyping();
+      renderMessage(msg);
+    })
+    .subscribe();
+
+  sb.channel('typing-' + chatId)
+    .on('broadcast', { event: 'typing' }, (payload) => {
+      if (payload.payload.user_id !== currentProfile.id) showTyping();
+    })
+    .subscribe();
+}
+
+function renderMessage(msg) {
+  const msgs = document.getElementById('messages');
+  const isMe = msg.sender_id === currentProfile.id;
+
+  if (msg.type === 'system') {
+    const sys = document.createElement('div');
+    sys.className = 'sys-msg';
+    sys.textContent = msg.content;
+    msgs.appendChild(sys);
+    msgs.scrollTop = msgs.scrollHeight;
+    return;
+  }
+
+  const row = document.createElement('div');
+  row.className = 'bubble-row' + (isMe ? ' me' : '');
+
+  if (!isMe) {
+    const av = document.createElement('div');
+    av.className = 'bubble-av-sm';
+    if (msg.sender?.avatar_url) {
+      av.innerHTML = `<img src="${msg.sender.avatar_url}" style="width:100%;height:100%;object-fit:cover;"/>`;
+    } else {
+      av.textContent = (msg.sender?.name || '?')[0].toUpperCase();
+    }
+    row.appendChild(av);
+  }
+
+  const bub = document.createElement('div');
+  bub.className = 'bubble ' + (isMe ? 'me' : 'them');
+  const t = new Date(msg.created_at);
+  const time = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
+
+  if (msg.type === 'photo') {
+    bub.innerHTML = `<img src="${msg.content}" style="max-width:180px;border-radius:10px;"/><div class="bubble-time">${time}</div>`;
+  } else {
+    bub.innerHTML = msg.content + `<div class="bubble-time">${time}</div>`;
+  }
+  row.appendChild(bub);
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || !currentMatch) return;
+
+  const msg = {
+    chat_id: currentMatch.id,
+    sender_id: currentProfile.id,
+    content: text,
+    type: 'text',
+    created_at: new Date().toISOString()
+  };
+
+  renderMessage({ ...msg, sender: currentProfile });
+  input.value = '';
+
+  await sb.from('messages').insert({
+    chat_id: msg.chat_id,
+    sender_id: msg.sender_id,
+    content: msg.content,
+    type: 'text'
+  });
+}
+
+async function sendPhotoMessage(e) {
+  const file = e.target.files[0];
+  if (!file || !currentMatch) return;
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `${currentMatch.id}/chat-${currentProfile.id}-${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from('live-photos').upload(path, file);
+  if (!error) {
+    const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
+    const msg = { chat_id: currentMatch.id, sender_id: currentProfile.id, content: urlData.publicUrl, type: 'photo' };
+    renderMessage({ ...msg, sender: currentProfile, created_at: new Date().toISOString() });
+    await sb.from('messages').insert(msg);
+  }
+}
+
+let typingTimeout = null;
+function showTyping() {
+  const row = document.getElementById('typingRow');
+  row.classList.add('show');
+  const msgs = document.getElementById('messages');
+  msgs.scrollTop = msgs.scrollHeight;
+  if (typingTimeout) clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(hideTyping, 3000);
+}
+function hideTyping() {
+  document.getElementById('typingRow').classList.remove('show');
+}
+
+async function subscribeToMatches() {
+  if (!currentProfile) return;
+
+  // Ascolta nuovi match_requests dove sei il destinatario (to_user)
+  // usando Supabase Realtime postgres_changes
+  if (realtimeChannel) sb.removeChannel(realtimeChannel);
+
+  realtimeChannel = sb.channel('match-requests-incoming-' + currentProfile.id)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'match_requests',
+      filter: `to_user=eq.${currentProfile.id}`
+    }, async (payload) => {
+      const req = payload.new;
+      if (req.status !== 'pending') return;
+
+      // Carica il profilo di chi ci ha inviato il match
+      const { data: fromProfile } = await sb.from('profiles')
+        .select('*').eq('id', req.from_user).single();
+      if (!fromProfile) return;
+
+      currentMatch = req;
+      matchedProfile = fromProfile;
+      renderMatchScreen(fromProfile);
+
+      // Mostra popup notifica se non siamo già sulla schermata match
+      const active = document.querySelector('.screen.active');
+      if (active && active.id !== 's-match') {
+        document.getElementById('incomingMatchName').textContent = fromProfile.name;
+        document.getElementById('popupIncomingMatch').classList.add('show');
+      } else {
+        goTo('match');
+        startMatchTimer();
+      }
+    })
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'match_requests',
+      filter: `from_user=eq.${currentProfile.id}`
+    }, async (payload) => {
+      const req = payload.new;
+      // L'altro utente ha risposto al nostro match request
+      if (req.status === 'accepted') {
+        stopMatchTimer();
+        // Carica chat se non già aperta
+        const active = document.querySelector('.screen.active');
+        if (active && active.id !== 's-chat') {
+          loadChatScreen();
+          goTo('chat');
+          subscribeToMessages();
+        }
+      } else if (req.status === 'rejected') {
+        stopMatchTimer();
+        document.getElementById('popupReject').classList.add('show');
+      }
+    })
+    .subscribe();
+}
+
+function leaveChat() {
+  if (msgChannel) sb.removeChannel(msgChannel);
+  currentMatch = null;
+  matchedProfile = null;
+  goTo('waiting');
+}
+
+// ============================================================
+// START
+// ============================================================
+init().then(() => {
+  if (currentProfile) subscribeToMatches();
+});
+</script>
+</body>
+</html>
