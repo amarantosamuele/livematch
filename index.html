@@ -460,6 +460,102 @@ body::before {
 .toggle input:checked + .toggle-slider{background:var(--accent);}
 .toggle input:checked + .toggle-slider:before{transform:translateX(20px);}
 
+
+/* ---- TOAST NOTIFICATION ---- */
+.toast-wrap {
+  position: absolute;
+  top: 48px; left: 12px; right: 12px;
+  z-index: 200;
+  display: flex; flex-direction: column; gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  background: var(--surface);
+  border: 0.5px solid var(--border2);
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  pointer-events: all;
+  transform: translateY(-80px);
+  opacity: 0;
+  transition: transform 0.4s cubic-bezier(0.34,1.4,0.64,1), opacity 0.3s ease;
+}
+.toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+.toast.hide {
+  transform: translateY(-80px);
+  opacity: 0;
+}
+.toast-av {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg,#f77f8a,#e64b6b);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Serif Display', serif; font-size: 16px; color: #fff;
+  flex-shrink: 0; overflow: hidden;
+}
+.toast-av img { width:100%;height:100%;object-fit:cover; }
+.toast-body { flex: 1; min-width: 0; }
+.toast-title { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.toast-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
+.toast-timer {
+  font-size: 11px; font-weight: 600; color: var(--accent);
+  flex-shrink: 0; min-width: 24px; text-align: right;
+}
+.toast-actions { display: flex; gap: 6px; margin-top: 8px; }
+.toast-btn {
+  flex: 1; padding: 7px 10px; border-radius: 10px;
+  font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+  cursor: pointer; border: none; transition: opacity 0.15s;
+}
+.toast-btn:hover { opacity: 0.85; }
+.toast-btn.accept { background: var(--green); color: #0a1f17; }
+.toast-btn.reject { background: var(--surface2); border: 0.5px solid rgba(255,77,109,0.3); color: var(--accent2); }
+.toast-btn.view { background: var(--surface2); border: 0.5px solid var(--border2); color: var(--blue); }
+.toast-progress {
+  position: absolute; bottom: 0; left: 0;
+  height: 2px; background: var(--accent);
+  border-radius: 0 0 18px 18px;
+  transition: width 1s linear;
+}
+
+
+/* ---- EDIT PROFILE ---- */
+#s-edit .body{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;}
+#s-edit .body::-webkit-scrollbar{width:3px}
+#s-edit .body::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
+.photos-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.photo-slot{
+  aspect-ratio:1;border-radius:var(--r);
+  background:var(--surface2);border:1.5px dashed var(--border2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;overflow:hidden;position:relative;
+  transition:border-color 0.2s;
+}
+.photo-slot:hover{border-color:var(--accent);}
+.photo-slot img{width:100%;height:100%;object-fit:cover;}
+.photo-slot .slot-icon{font-size:24px;opacity:0.4;}
+.photo-slot .slot-label{font-size:10px;color:var(--text3);margin-top:4px;}
+.photo-slot .slot-badge{
+  position:absolute;top:4px;left:4px;
+  background:var(--accent);color:#fff;
+  font-size:9px;font-weight:600;padding:2px 6px;border-radius:6px;
+}
+.photo-slot .slot-remove{
+  position:absolute;top:4px;right:4px;
+  width:20px;height:20px;border-radius:50%;
+  background:rgba(0,0,0,0.6);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;cursor:pointer;
+}
+.section-label{
+  font-size:11px;font-weight:600;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.5px;
+  margin-bottom:-4px;
+}
+
 /* ---- LOADING ---- */
 #loading{
   position:fixed;inset:0;background:var(--bg);
@@ -483,6 +579,9 @@ body::before {
 </div>
 
 <div id="app" style="display:none;">
+  <!-- TOAST NOTIFICATIONS -->
+  <div class="toast-wrap" id="toastWrap"></div>
+
   <div class="notch"></div>
   <div class="statusbar">
     <span id="clock">--:--</span>
@@ -769,6 +868,75 @@ body::before {
   </div>
 
 
+
+  <!-- ===== EDIT PROFILE ===== -->
+  <div class="screen" id="s-edit">
+    <div class="topbar" style="border-bottom:0.5px solid var(--border);">
+      <button onclick="goTo('profile')" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
+      <div style="font-size:14px;font-weight:500;">Modifica profilo</div>
+      <div style="width:24px"></div>
+    </div>
+    <div class="body">
+      <div class="section-label">Foto profilo</div>
+      <div class="photos-grid">
+        <!-- Foto principale -->
+        <div class="photo-slot" id="editSlot0" onclick="triggerPhotoEdit(0)" style="grid-column:span 1;">
+          <div class="slot-badge">Principale</div>
+          <span class="slot-icon">📷</span>
+          <span class="slot-label">Aggiungi</span>
+        </div>
+        <!-- Foto extra 1 -->
+        <div class="photo-slot" id="editSlot1" onclick="triggerPhotoEdit(1)">
+          <span class="slot-icon">＋</span>
+          <span class="slot-label">Foto 2</span>
+        </div>
+        <!-- Foto extra 2 -->
+        <div class="photo-slot" id="editSlot2" onclick="triggerPhotoEdit(2)">
+          <span class="slot-icon">＋</span>
+          <span class="slot-label">Foto 3</span>
+        </div>
+      </div>
+      <input type="file" id="editPhotoInput" accept="image/*" style="display:none" onchange="handleEditPhoto(event)"/>
+
+      <div class="section-label">Informazioni</div>
+      <div class="field"><label>NOME</label><input type="text" id="editName" placeholder="Il tuo nome"/></div>
+      <div class="row2">
+        <div class="field"><label>ETÀ</label><input type="number" id="editAge" min="18" max="99"/></div>
+        <div class="field"><label>CITTÀ</label><input type="text" id="editCity" placeholder="Milano"/></div>
+      </div>
+      <div class="field">
+        <label>GENERE</label>
+        <select id="editGender">
+          <option value="uomo">Uomo</option>
+          <option value="donna">Donna</option>
+          <option value="altro">Altro</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>ORIENTAMENTO</label>
+        <select id="editOrientation">
+          <option value="eterosessuale">Eterosessuale</option>
+          <option value="omosessuale">Omosessuale</option>
+          <option value="bisessuale">Bisessuale</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>CERCO</label>
+        <select id="editLookingFor">
+          <option value="uomo">Uomini</option>
+          <option value="donna">Donne</option>
+          <option value="entrambi">Entrambi</option>
+        </select>
+      </div>
+      <div class="field"><label>BIO</label><textarea id="editBio" placeholder="Raccontati in poche parole…"></textarea></div>
+
+      <div id="editError" class="error-msg" style="display:none"></div>
+      <div id="editSuccess" class="success-msg" style="display:none"></div>
+      <button class="btn-primary" id="btnSaveEdit" onclick="saveEditProfile()">💾 Salva modifiche</button>
+      <div style="height:16px"></div>
+    </div>
+  </div>
+
   <!-- ===== CHAT LIST ===== -->
   <div class="screen" id="s-chats">
     <div class="topbar">
@@ -822,6 +990,8 @@ body::before {
           <div class="stat-lbl">Chat avviate</div>
         </div>
       </div>
+      <button class="btn-primary" onclick="openEditProfile()" style="background:var(--surface2);border:0.5px solid var(--border2);color:var(--text);">✏️ Modifica profilo</button>
+
       <!-- TOGGLE REMATCH -->
       <div class="toggle-row">
         <div class="toggle-label">
@@ -874,6 +1044,264 @@ let msgChannel = null;
 let onlineChannel = null;
 let avatarFileToUpload = null;
 
+
+
+// ============================================================
+// TOAST NOTIFICATION SYSTEM
+// ============================================================
+let toastTimerInt = null;
+let toastSecs = 60;
+let toastMatchData = null; // { match, profile, type: 'match'|'photo' }
+
+function showToast({ profile, type, matchData }) {
+  // Rimuovi eventuale toast precedente
+  dismissToast();
+
+  toastMatchData = { profile, type, matchData };
+  toastSecs = 60;
+
+  const wrap = document.getElementById('toastWrap');
+
+  const avHtml = profile.avatar_url
+    ? `<img src="${profile.avatar_url}" alt="${profile.name}"/>`
+    : profile.name[0].toUpperCase();
+
+  const titleText = type === 'photo'
+    ? `📸 ${profile.name} ti chiede una foto`
+    : `💘 ${profile.name} vuole fare match!`;
+
+  const subText = type === 'photo'
+    ? 'Hai 60 secondi per scattare una foto dal vivo'
+    : `${profile.age} anni · ${profile.city} · Hai 60s per rispondere`;
+
+  const actionsHtml = type === 'photo'
+    ? `<button class="toast-btn view" onclick="toastViewProfile()">Vedi profilo</button>
+       <button class="toast-btn accept" onclick="toastSendPhoto()">📸 Scatta foto</button>
+       <button class="toast-btn reject" onclick="dismissToast()">Ignora</button>`
+    : `<button class="toast-btn view" onclick="toastViewProfile()">Vedi profilo</button>
+       <button class="toast-btn accept" onclick="toastAccept()">✓ Accetta</button>
+       <button class="toast-btn reject" onclick="toastReject()">✕ Rifiuta</button>`;
+
+  wrap.innerHTML = `
+    <div class="toast" id="mainToast" style="position:relative;overflow:hidden;">
+      <div class="toast-av">${avHtml}</div>
+      <div class="toast-body">
+        <div class="toast-title">${titleText}</div>
+        <div class="toast-sub">${subText}</div>
+        <div class="toast-actions">${actionsHtml}</div>
+      </div>
+      <div class="toast-timer" id="toastTimer">60s</div>
+      <div class="toast-progress" id="toastProgress" style="width:100%"></div>
+    </div>
+  `;
+
+  // Mostra con animazione
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const t = document.getElementById('mainToast');
+      if (t) t.classList.add('show');
+    });
+  });
+
+  // Timer countdown
+  if (toastTimerInt) clearInterval(toastTimerInt);
+  toastTimerInt = setInterval(() => {
+    toastSecs--;
+    const timerEl = document.getElementById('toastTimer');
+    const progressEl = document.getElementById('toastProgress');
+    if (timerEl) timerEl.textContent = toastSecs + 's';
+    if (progressEl) progressEl.style.width = (toastSecs / 60 * 100) + '%';
+    if (toastSecs <= 10 && timerEl) timerEl.style.color = '#ff8c00';
+    if (toastSecs <= 0) dismissToast();
+  }, 1000);
+}
+
+function dismissToast() {
+  if (toastTimerInt) { clearInterval(toastTimerInt); toastTimerInt = null; }
+  const t = document.getElementById('mainToast');
+  if (t) {
+    t.classList.remove('show');
+    t.classList.add('hide');
+    setTimeout(() => {
+      const wrap = document.getElementById('toastWrap');
+      if (wrap) wrap.innerHTML = '';
+    }, 400);
+  }
+  toastMatchData = null;
+}
+
+function toastViewProfile() {
+  if (!toastMatchData) return;
+  // Mostra il profilo nella schermata match senza avviare il timer
+  const { profile, matchData } = toastMatchData;
+  currentMatch = matchData;
+  matchedProfile = profile;
+  renderMatchScreen(profile);
+  goTo('match');
+  startMatchTimer();
+  dismissToast();
+}
+
+function toastAccept() {
+  if (!toastMatchData) return;
+  const { matchData, profile } = toastMatchData;
+  currentMatch = matchData;
+  matchedProfile = profile;
+  dismissToast();
+  acceptMatch();
+}
+
+function toastReject() {
+  if (!toastMatchData) return;
+  const { matchData } = toastMatchData;
+  currentMatch = matchData;
+  dismissToast();
+  rejectMatch();
+}
+
+function toastSendPhoto() {
+  if (!toastMatchData) return;
+  const { matchData, profile } = toastMatchData;
+  currentMatch = matchData;
+  matchedProfile = profile;
+  dismissToast();
+  document.getElementById('photoTitle').textContent = profile.name + ' ti ha chiesto una foto dal vivo';
+  goTo('photo');
+  startPhotoTimer();
+}
+
+
+// ============================================================
+// EDIT PROFILE
+// ============================================================
+let editPhotoSlot = 0; // quale slot stiamo modificando
+let editPhotos = [null, null, null]; // file da caricare [principale, extra1, extra2]
+let editPhotoUrls = [null, null, null]; // URL attuali
+
+function openEditProfile() {
+  if (!currentProfile) return;
+  const p = currentProfile;
+
+  // Precompila campi
+  document.getElementById('editName').value = p.name || '';
+  document.getElementById('editAge').value = p.age || '';
+  document.getElementById('editCity').value = p.city || '';
+  document.getElementById('editGender').value = p.gender || 'altro';
+  document.getElementById('editOrientation').value = p.orientation || 'bisessuale';
+  document.getElementById('editLookingFor').value = p.looking_for || 'entrambi';
+  document.getElementById('editBio').value = p.bio || '';
+
+  // Foto
+  editPhotos = [null, null, null];
+  const urls = [
+    p.avatar_url || null,
+    p.photo2_url || null,
+    p.photo3_url || null
+  ];
+  editPhotoUrls = [...urls];
+  urls.forEach((url, i) => renderEditSlot(i, url));
+
+  document.getElementById('editError').style.display = 'none';
+  document.getElementById('editSuccess').style.display = 'none';
+  goTo('edit');
+}
+
+function triggerPhotoEdit(slot) {
+  editPhotoSlot = slot;
+  document.getElementById('editPhotoInput').value = '';
+  document.getElementById('editPhotoInput').click();
+}
+
+function handleEditPhoto(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  editPhotos[editPhotoSlot] = file;
+  const url = URL.createObjectURL(file);
+  editPhotoUrls[editPhotoSlot] = url;
+  renderEditSlot(editPhotoSlot, url);
+}
+
+function renderEditSlot(i, url) {
+  const slot = document.getElementById('editSlot' + i);
+  if (!slot) return;
+  if (url) {
+    slot.innerHTML = `
+      ${i === 0 ? '<div class="slot-badge">Principale</div>' : ''}
+      <img src="${url}" alt="foto ${i+1}"/>
+      <div class="slot-remove" onclick="removeEditSlot(event,${i})">✕</div>
+    `;
+  } else {
+    slot.innerHTML = `
+      ${i === 0 ? '<div class="slot-badge">Principale</div>' : ''}
+      <span class="slot-icon">${i === 0 ? '📷' : '＋'}</span>
+      <span class="slot-label">${i === 0 ? 'Foto principale' : 'Foto ' + (i+1)}</span>
+    `;
+  }
+}
+
+function removeEditSlot(e, i) {
+  e.stopPropagation();
+  editPhotos[i] = null;
+  editPhotoUrls[i] = null;
+  renderEditSlot(i, null);
+}
+
+async function saveEditProfile() {
+  const btn = document.getElementById('btnSaveEdit');
+  const errEl = document.getElementById('editError');
+  const okEl = document.getElementById('editSuccess');
+  errEl.style.display = 'none';
+  okEl.style.display = 'none';
+
+  const name = document.getElementById('editName').value.trim();
+  const age = parseInt(document.getElementById('editAge').value);
+  const city = document.getElementById('editCity').value.trim();
+  const gender = document.getElementById('editGender').value;
+  const orientation = document.getElementById('editOrientation').value;
+  const looking_for = document.getElementById('editLookingFor').value;
+  const bio = document.getElementById('editBio').value.trim();
+
+  if (!name || !age || !city) {
+    errEl.textContent = 'Nome, età e città sono obbligatori.';
+    errEl.style.display = 'block'; return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Salvataggio…';
+
+  const updates = { name, age, city, gender, orientation, looking_for, bio };
+
+  // Upload foto se cambiate
+  const bucketFields = ['avatar_url', 'photo2_url', 'photo3_url'];
+  const suffixes = ['avatar', 'photo2', 'photo3'];
+
+  for (let i = 0; i < 3; i++) {
+    if (editPhotos[i]) {
+      const ext = editPhotos[i].name.split('.').pop() || 'jpg';
+      const path = `${currentUser.id}/${suffixes[i]}.${ext}`;
+      const { error: upErr } = await sb.storage.from('avatars').upload(path, editPhotos[i], { upsert: true });
+      if (!upErr) {
+        const { data: urlData } = sb.storage.from('avatars').getPublicUrl(path);
+        updates[bucketFields[i]] = urlData.publicUrl + '?t=' + Date.now();
+      }
+    } else if (editPhotoUrls[i] === null && currentProfile[bucketFields[i]]) {
+      // Foto rimossa
+      updates[bucketFields[i]] = null;
+    }
+  }
+
+  const { data, error } = await sb.from('profiles').update(updates).eq('id', currentUser.id).select().single();
+
+  btn.disabled = false; btn.textContent = '💾 Salva modifiche';
+
+  if (error) {
+    errEl.textContent = error.message; errEl.style.display = 'block'; return;
+  }
+
+  currentProfile = data;
+  renderProfileScreen(data);
+  okEl.textContent = '✓ Profilo aggiornato!'; okEl.style.display = 'block';
+  setTimeout(() => { okEl.style.display = 'none'; goTo('profile'); }, 1500);
+}
 
 // ============================================================
 // NAVIGATION WITH NAV BAR
@@ -1152,11 +1580,30 @@ function renderProfileScreen(p) {
   if (p.avatar_url) {
     av.innerHTML = `<img src="${p.avatar_url}" alt="${p.name}"/>`;
   } else {
-    av.textContent = p.name[0].toUpperCase();
+    av.textContent = p.name ? p.name[0].toUpperCase() : '?';
   }
   document.getElementById('profileName').textContent = p.name + ', ' + p.age;
   document.getElementById('profileMeta').textContent = p.city + ' · ' + p.orientation;
   document.getElementById('profileBio').textContent = p.bio || 'Nessuna bio ancora.';
+
+  // Mostra miniature extra foto se presenti
+  let photosHtml = '';
+  if (p.photo2_url || p.photo3_url) {
+    photosHtml = '<div style="display:flex;gap:6px;margin-top:4px;">';
+    if (p.photo2_url) photosHtml += `<img src="${p.photo2_url}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;border:0.5px solid var(--border2)"/>`;
+    if (p.photo3_url) photosHtml += `<img src="${p.photo3_url}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;border:0.5px solid var(--border2)"/>`;
+    photosHtml += '</div>';
+  }
+  const bioEl = document.getElementById('profileBio');
+  // Rimuovi miniature precedenti se presenti
+  const prevMini = document.getElementById('profileMiniPhotos');
+  if (prevMini) prevMini.remove();
+  if (photosHtml) {
+    const div = document.createElement('div');
+    div.id = 'profileMiniPhotos';
+    div.innerHTML = photosHtml;
+    bioEl.after(div);
+  }
 
   // stats
   sb.from('match_requests').select('id', {count:'exact'})
@@ -1472,13 +1919,24 @@ async function requestPhoto() {
   stopMatchTimer();
 
   // Crea photo request nel DB
-  await sb.from('photo_requests').insert({
+  const { data: photoReq } = await sb.from('photo_requests').insert({
     match_id: currentMatch.id,
     from_user: currentProfile.id,
     to_user: matchedProfile.id
+  }).select().single();
+
+  // Manda notifica realtime all'altro utente via broadcast
+  sb.channel('photo-req-' + matchedProfile.id).send({
+    type: 'broadcast',
+    event: 'photo-request',
+    payload: {
+      from_profile: currentProfile,
+      match_id: currentMatch.id,
+      match_data: currentMatch
+    }
   });
 
-  document.getElementById('photoTitle').textContent = matchedProfile.name + ' ti ha chiesto\nuna foto dal vivo';
+  document.getElementById('photoTitle').textContent = 'Stai chiedendo una foto a ' + matchedProfile.name;
   goTo('photo');
   startPhotoTimer();
 }
@@ -1726,15 +2184,12 @@ async function subscribeToMatches() {
       matchedProfile = fromProfile;
       renderMatchScreen(fromProfile);
 
-      // Mostra popup notifica se non siamo già sulla schermata match
-      const active = document.querySelector('.screen.active');
-      if (active && active.id !== 's-match') {
-        document.getElementById('incomingMatchName').textContent = fromProfile.name;
-        document.getElementById('popupIncomingMatch').classList.add('show');
-      } else {
-        goTo('match');
-        startMatchTimer();
-      }
+      // Mostra toast non invasivo in alto
+      showToast({
+        profile: fromProfile,
+        type: 'match',
+        matchData: req
+      });
     })
     .on('postgres_changes', {
       event: 'UPDATE',
@@ -1757,6 +2212,25 @@ async function subscribeToMatches() {
         stopMatchTimer();
         document.getElementById('popupReject').classList.add('show');
       }
+    })
+    .subscribe();
+
+  // Ascolta richieste foto dal vivo in arrivo
+  sb.channel('photo-req-' + currentProfile.id)
+    .on('broadcast', { event: 'photo-request' }, async (payload) => {
+      const { from_profile, match_data } = payload.payload;
+      if (!from_profile) return;
+
+      // Aggiorna stato corrente
+      if (!currentMatch) currentMatch = match_data;
+      if (!matchedProfile) matchedProfile = from_profile;
+
+      // Mostra toast foto
+      showToast({
+        profile: from_profile,
+        type: 'photo',
+        matchData: match_data
+      });
     })
     .subscribe();
 }
