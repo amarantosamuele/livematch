@@ -562,6 +562,54 @@ body::before {
   margin-bottom:-4px;
 }
 
+
+/* ---- MATCH ACCEPTED ---- */
+#s-accepted .body {
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:20px;padding:24px;
+}
+.accepted-heart {
+  font-size:80px;
+  animation:heartPop 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  transform:scale(0);
+}
+@keyframes heartPop {
+  0%{transform:scale(0);opacity:0}
+  60%{transform:scale(1.2)}
+  100%{transform:scale(1);opacity:1}
+}
+.accepted-rings {
+  position:relative;width:160px;height:160px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.acc-ring {
+  position:absolute;border-radius:50%;
+  border:2px solid rgba(255,77,109,0.4);
+  animation:accRing 1s ease-out forwards;opacity:0;
+}
+.acc-ring:nth-child(1){animation-delay:0.1s;}
+.acc-ring:nth-child(2){animation-delay:0.3s;}
+.acc-ring:nth-child(3){animation-delay:0.5s;}
+@keyframes accRing{
+  0%{width:40px;height:40px;opacity:0.8;}
+  100%{width:160px;height:160px;opacity:0;}
+}
+.accepted-title {
+  font-family:'DM Serif Display',serif;
+  font-size:30px;text-align:center;line-height:1.2;
+}
+.accepted-title em{color:var(--accent);font-style:italic;}
+.accepted-sub{font-size:14px;color:var(--text2);text-align:center;}
+.accepted-avatars{display:flex;align-items:center;gap:12px;}
+.accepted-av{
+  width:56px;height:56px;border-radius:50%;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'DM Serif Display',serif;font-size:20px;color:#fff;
+  border:3px solid var(--surface);
+}
+
 /* ---- LOADING ---- */
 #loading{
   position:fixed;inset:0;background:var(--bg);
@@ -876,12 +924,37 @@ body::before {
     <div class="input-row">
       <div class="chat-photo-btn" onclick="document.getElementById('chatPhotoInput').click()">📸</div>
       <input type="file" id="chatPhotoInput" accept="image/*" onchange="sendPhotoMessage(event)"/>
-      <input type="text" id="chatInput" placeholder="Scrivi un messaggio…" onkeydown="if(event.key==='Enter')sendMessage()"/>
+      <input type="text" id="chatInput" placeholder="Scrivi un messaggio…" onkeydown="if(event.key==='Enter')sendMessage()" oninput="handleChatInput()"/>
       <button class="send-btn" onclick="sendMessage()">➤</button>
     </div>
   </div>
 
 
+
+
+  <!-- ===== MATCH ACCEPTED ===== -->
+  <div class="screen" id="s-accepted">
+    <div class="topbar">
+      <div class="logo">Live<span>Match</span></div>
+      <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+    </div>
+    <div class="body">
+      <div class="accepted-rings">
+        <div class="acc-ring"></div>
+        <div class="acc-ring"></div>
+        <div class="acc-ring"></div>
+        <div class="accepted-heart">❤️</div>
+      </div>
+      <div class="accepted-title">È un<br/><em>Match!</em></div>
+      <div class="accepted-avatars">
+        <div class="accepted-av" id="acceptedAvMe" style="background:linear-gradient(135deg,#64a8f0,#2575d0)"></div>
+        <span style="font-size:24px">💘</span>
+        <div class="accepted-av" id="acceptedAvThem" style="background:linear-gradient(135deg,#f77f8a,#e64b6b)"></div>
+      </div>
+      <div class="accepted-sub" id="acceptedSub">Tu e qualcuno vi siete piaciuti!</div>
+      <button class="btn-primary" id="btnGoChat" onclick="goTo('chat')">💬 Inizia a chattare</button>
+    </div>
+  </div>
 
   <!-- ===== EDIT PROFILE ===== -->
   <div class="screen" id="s-edit">
@@ -1060,6 +1133,52 @@ let avatarFileToUpload = null;
 
 
 
+
+// ============================================================
+// SUONO + VIBRAZIONE
+// ============================================================
+function playMatchSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // Nota 1
+    const o1 = ctx.createOscillator();
+    const g1 = ctx.createGain();
+    o1.connect(g1); g1.connect(ctx.destination);
+    o1.frequency.value = 520; o1.type = 'sine';
+    g1.gain.setValueAtTime(0, ctx.currentTime);
+    g1.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+    g1.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.25);
+    o1.start(ctx.currentTime); o1.stop(ctx.currentTime + 0.25);
+    // Nota 2
+    const o2 = ctx.createOscillator();
+    const g2 = ctx.createGain();
+    o2.connect(g2); g2.connect(ctx.destination);
+    o2.frequency.value = 680; o2.type = 'sine';
+    g2.gain.setValueAtTime(0, ctx.currentTime + 0.2);
+    g2.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.28);
+    g2.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.55);
+    o2.start(ctx.currentTime + 0.2); o2.stop(ctx.currentTime + 0.55);
+  } catch(e) {}
+}
+
+function playPhotoSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 440; o.type = 'sine';
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.05);
+    g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
+    o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.3);
+  } catch(e) {}
+}
+
+function vibrate(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
 // ============================================================
 // TOAST NOTIFICATION SYSTEM
 // ============================================================
@@ -1116,6 +1235,8 @@ function showToast({ profile, type, matchData }) {
       if (t) {
         t.classList.add('show');
         console.log('[LiveMatch] Toast shown:', type, 'for', profile.name);
+        if (type === 'match') { playMatchSound(); vibrate([100, 50, 100]); }
+        if (type === 'photo') { playPhotoSound(); vibrate([200]); }
       }
     });
   });
@@ -1164,6 +1285,7 @@ function toastAccept() {
   const { matchData, profile } = toastMatchData;
   currentMatch = matchData;
   matchedProfile = profile;
+  renderMatchScreen(profile);
   dismissToast();
   acceptMatch();
 }
@@ -1664,7 +1786,7 @@ async function setupOnlinePresence() {
         .update({ is_online: true, last_seen: new Date().toISOString() })
         .eq('id', currentUser.id);
     }
-  }, 25000);
+  }, 3000);
 
   // Realtime: aggiorna il contatore quando i profili cambiano
   onlineChannel = sb.channel('online-presence-' + currentUser.id)
@@ -1678,7 +1800,7 @@ async function setupOnlinePresence() {
 
   // Polling ogni 20s — ricarica il contatore basato su last_seen
   if (window._onlinePoller) clearInterval(window._onlinePoller);
-  window._onlinePoller = setInterval(loadOnlineCount, 20000);
+  window._onlinePoller = setInterval(loadOnlineCount, 2000);
 
   // Tenta setOffline anche su beforeunload (funziona su desktop)
   window.removeEventListener('beforeunload', setOffline);
@@ -1735,7 +1857,7 @@ async function loadOnlineCount() {
   if (!currentUser) return;
   // Conta utenti con last_seen negli ultimi 60 secondi
   // Questo è molto più affidabile di is_online boolean
-  const threshold = new Date(Date.now() - 60 * 1000).toISOString();
+  const threshold = new Date(Date.now() - 3 * 1000).toISOString();
   const { count, error } = await sb.from('profiles')
     .select('id', { count: 'exact', head: true })
     .gte('last_seen', threshold)
@@ -1764,10 +1886,10 @@ async function findMatch() {
 
   // Trova utenti online compatibili (escludi te stesso)
   // Considera online chi ha last_seen negli ultimi 60s
-  const oneMinAgo = new Date(Date.now() - 60 * 1000).toISOString();
+  const threeSecsAgo = new Date(Date.now() - 3 * 1000).toISOString();
   const { data: candidates } = await sb.from('profiles')
     .select('*')
-    .gte('last_seen', oneMinAgo)
+    .gte('last_seen', threeSecsAgo)
     .neq('id', currentProfile.id)
     .limit(50);
 
@@ -1915,17 +2037,48 @@ async function rejectMatch() {
 async function acceptMatch() {
   stopMatchTimer();
   if (currentMatch) {
-    await sb.from('match_requests').update({ status: 'accepted' }).eq('id', currentMatch.id);
+    await sb.from('match_requests')
+      .update({ status: 'accepted' })
+      .eq('id', currentMatch.id);
   }
-  loadChatScreen();
-  goTo('chat');
-  subscribeToMessages();
-  await sb.from('messages').insert({
-    chat_id: currentMatch?.id,
-    sender_id: currentProfile.id,
-    content: '🎉 Match accettato! Iniziate a chattare.',
-    type: 'system'
+  showAcceptedScreen();
+}
+
+function showAcceptedScreen() {
+  // Avatar mio
+  const meAv = document.getElementById('acceptedAvMe');
+  if (currentProfile) {
+    if (currentProfile.avatar_url) {
+      meAv.innerHTML = '<img src="' + currentProfile.avatar_url + '" style="width:100%;height:100%;object-fit:cover;"/>';
+    } else {
+      meAv.textContent = currentProfile.name[0].toUpperCase();
+    }
+  }
+  // Avatar loro
+  const themAv = document.getElementById('acceptedAvThem');
+  if (matchedProfile) {
+    if (matchedProfile.avatar_url) {
+      themAv.innerHTML = '<img src="' + matchedProfile.avatar_url + '" style="width:100%;height:100%;object-fit:cover;"/>';
+    } else {
+      themAv.textContent = matchedProfile.name[0].toUpperCase();
+    }
+    document.getElementById('acceptedSub').textContent =
+      'Tu e ' + matchedProfile.name + ' vi siete piaciuti!';
+  }
+  // Ri-trigghera animazioni
+  document.querySelectorAll('.acc-ring').forEach(function(r) {
+    r.style.animation = 'none'; void r.offsetWidth; r.style.animation = '';
   });
+  const heart = document.querySelector('.accepted-heart');
+  if (heart) { heart.style.animation = 'none'; void heart.offsetWidth; heart.style.animation = ''; }
+
+  playMatchSound();
+  vibrate([100, 50, 200]);
+  goTo('accepted');
+
+  // Prepara chat in background
+  loadChatScreen();
+  subscribeToMessages();
 }
 
 // ============================================================
@@ -2155,14 +2308,25 @@ async function sendPhotoMessage(e) {
 let typingTimeout = null;
 function showTyping() {
   const row = document.getElementById('typingRow');
-  row.classList.add('show');
+  if (row) row.classList.add('show');
   const msgs = document.getElementById('messages');
-  msgs.scrollTop = msgs.scrollHeight;
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
   if (typingTimeout) clearTimeout(typingTimeout);
   typingTimeout = setTimeout(hideTyping, 3000);
 }
 function hideTyping() {
-  document.getElementById('typingRow').classList.remove('show');
+  const row = document.getElementById('typingRow');
+  if (row) row.classList.remove('show');
+}
+
+// Invia evento typing quando l'utente scrive
+function handleChatInput() {
+  if (!currentMatch || !currentProfile) return;
+  sb.channel('typing-' + currentMatch.id).send({
+    type: 'broadcast',
+    event: 'typing',
+    payload: { user_id: currentProfile.id }
+  }).catch(() => {});
 }
 
 async function subscribeToMatches() {
