@@ -2098,8 +2098,15 @@ function updateTimerUI(t, max) {
 }
 
 async function expireMatch() {
-  // A non ha deciso entro 30s → nessun match_request nel DB da aggiornare
+  // Non fare nulla se siamo già in chat o schermata accepted
+  const active = document.querySelector('.screen.active');
+  if (active && (active.id === 's-chat' || active.id === 's-accepted' || active.id === 's-waiting-response')) return;
+
+  // Controlla status aggiornato nel DB prima di scadere
   if (currentMatch) {
+    const { data: latest } = await sb.from('match_requests')
+      .select('status').eq('id', currentMatch.id).single();
+    if (latest && latest.status === 'accepted') return;
     await sb.from('match_requests')
       .update({ status: 'expired' })
       .eq('id', currentMatch.id);
@@ -2215,6 +2222,8 @@ function showAcceptedScreen() {
   const heart = document.querySelector('.accepted-heart');
   if (heart) { heart.style.animation = 'none'; void heart.offsetWidth; heart.style.animation = ''; }
 
+  stopMatchTimer();
+  if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
   playMatchSound();
   vibrate([100, 50, 200]);
   goTo('accepted');
@@ -2606,9 +2615,10 @@ async function subscribeToMatches() {
       // L'altro utente ha risposto al nostro match request
       if (req.status === 'accepted') {
         // A riceve notifica che B ha accettato
+        stopMatchTimer();
+        if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
         const active = document.querySelector('.screen.active');
         if (active && active.id !== 's-chat' && active.id !== 's-accepted') {
-          if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
           currentMatch = req;
           // Carica profilo di B se non presente
           if (!matchedProfile) {
