@@ -1729,9 +1729,9 @@ async function doRegister() {
 }
 
 async function doLogout() {
-  // Ferma heartbeat e poller
   if (window._heartbeat) { clearInterval(window._heartbeat); window._heartbeat = null; }
   if (window._onlinePoller) { clearInterval(window._onlinePoller); window._onlinePoller = null; }
+  if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
   document.removeEventListener('visibilitychange', handleVisibility);
   await setOffline();
   await sb.auth.signOut();
@@ -2393,71 +2393,74 @@ function loadChatScreen() {
 
 async function subscribeToMessages() {
   if (msgChannel) { sb.removeChannel(msgChannel); msgChannel = null; }
+  if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
   if (!currentMatch || !currentProfile) return;
 
   const chatId = currentMatch.id;
+  let lastMsgTime = new Date(0).toISOString();
 
-  // Carica messaggi esistenti dal DB
-  const { data: existing, error: loadErr } = await sb.from('messages')
-    .select('*')
-    .eq('chat_id', chatId)
-    .order('created_at', { ascending: true });
+  // Carica tutti i messaggi esistenti
+  async function loadAllMessages() {
+    const { data, error } = await sb.from('messages')
+      .select('*')
+      .eq('chat_id', chatId)
+      .order('created_at', { ascending: true });
 
-  if (loadErr) console.error('load messages error:', loadErr);
+    if (error) { console.error('load messages error:', error); return; }
 
-  // Renderizza messaggi esistenti
-  const msgsArea = document.getElementById('messages');
-  if (msgsArea) {
+    const msgsArea = document.getElementById('messages');
+    if (!msgsArea) return;
+
     msgsArea.innerHTML = '';
     const sys = document.createElement('div');
     sys.className = 'sys-msg';
     sys.textContent = 'Match live con ' + (matchedProfile ? matchedProfile.name : '') + '!';
     msgsArea.appendChild(sys);
-  }
-  if (existing && existing.length > 0) {
-    for (const m of existing) {
-      if (m.sender_id !== currentProfile.id) {
-        const { data: sender } = await sb.from('profiles')
-          .select('name,avatar_url').eq('id', m.sender_id).single();
-        m.sender = sender;
-      } else {
-        m.sender = currentProfile;
+
+    if (data && data.length > 0) {
+      for (const m of data) {
+        if (m.sender_id !== currentProfile.id) {
+          const { data: sender } = await sb.from('profiles')
+            .select('name,avatar_url').eq('id', m.sender_id).single();
+          m.sender = sender;
+        } else {
+          m.sender = currentProfile;
+        }
+        renderMessage(m);
       }
-      renderMessage(m);
+      lastMsgTime = data[data.length - 1].created_at;
     }
   }
 
-  // Realtime: ascolta TUTTI gli insert su messages e filtra lato client
-  // Questo evita problemi con i filtri realtime di Supabase
-  msgChannel = sb.channel('chat-room-' + chatId)
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'messages'
-    }, async (payload) => {
-      const msg = payload.new;
-      // Filtra solo i messaggi di questa chat
-      if (msg.chat_id !== chatId) return;
-      // Non mostrare i propri messaggi (già mostrati localmente)
-      if (msg.sender_id === currentProfile.id) return;
-      // Carica profilo mittente
-      const { data: sender } = await sb.from('profiles')
-        .select('name,avatar_url').eq('id', msg.sender_id).single();
-      msg.sender = sender;
-      hideTyping();
-      renderMessage(msg);
-    })
-    .subscribe((status) => {
-      console.log('[LiveMatch] Chat channel status:', status, 'chatId:', chatId);
-    });
+  // Polling: controlla nuovi messaggi ogni 2s
+  async function pollNewMessages() {
+    if (!currentMatch || currentMatch.id !== chatId) return;
+    const { data } = await sb.from('messages')
+      .select('*')
+      .eq('chat_id', chatId)
+      .gt('created_at', lastMsgTime)
+      .order('created_at', { ascending: true });
 
-  // Typing indicator
-  const typingChannel = sb.channel('typing-room-' + chatId)
-    .on('broadcast', { event: 'typing' }, (payload) => {
-      if (payload.payload && payload.payload.user_id !== currentProfile.id) showTyping();
-    })
-    .subscribe();
+    if (data && data.length > 0) {
+      hideTyping();
+      for (const m of data) {
+        if (m.sender_id === currentProfile.id) continue; // già mostrato localmente
+        const { data: sender } = await sb.from('profiles')
+          .select('name,avatar_url').eq('id', m.sender_id).single();
+        m.sender = sender;
+        renderMessage(m);
+        lastMsgTime = m.created_at;
+      }
+    }
+  }
+
+  await loadAllMessages();
+
+  // Avvia polling ogni 2s
+  window._msgPoller = setInterval(pollNewMessages, 1000);
+  console.log('[LiveMatch] Chat polling started for', chatId);
 }
+
 
 function renderMessage(msg) {
   const msgs = document.getElementById('messages');
@@ -2669,9 +2672,8 @@ async function subscribeToMatches() {
 }
 
 function leaveChat() {
-  // NON azzerare currentMatch e matchedProfile
-  // La chat rimane accessibile dalla sezione Chat
   if (msgChannel) { sb.removeChannel(msgChannel); msgChannel = null; }
+  if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
   navTo('waiting');
 }
 
