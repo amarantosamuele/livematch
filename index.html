@@ -2126,7 +2126,27 @@ async function acceptMatch() {
   if (!matchedProfile || !currentProfile) return;
 
   if (!currentMatch) {
-    // A sta accettando per primo → crea match_request nel DB
+    // Controlla se esiste già un match_request nei due sensi
+    const { data: existing } = await sb.from('match_requests')
+      .select('*')
+      .or(
+        'and(from_user.eq.' + currentProfile.id + ',to_user.eq.' + matchedProfile.id + '),' +
+        'and(from_user.eq.' + matchedProfile.id + ',to_user.eq.' + currentProfile.id + ')'
+      )
+      .in('status', ['pending', 'photo_requested'])
+      .maybeSingle();
+
+    if (existing) {
+      // Esiste già un match_request → B sta accettando quello di A
+      currentMatch = existing;
+      await sb.from('match_requests')
+        .update({ status: 'accepted' })
+        .eq('id', existing.id);
+      showAcceptedScreen();
+      return;
+    }
+
+    // Non esiste → A crea il match_request per primo
     const { data: match, error } = await sb.from('match_requests').insert({
       from_user: currentProfile.id,
       to_user: matchedProfile.id,
@@ -2134,17 +2154,30 @@ async function acceptMatch() {
     }).select().single();
 
     if (error) {
-      console.error('match insert error:', error);
+      // Race condition: qualcuno ha inserito nel frattempo, ricarica
+      const { data: retry } = await sb.from('match_requests')
+        .select('*')
+        .or(
+          'and(from_user.eq.' + currentProfile.id + ',to_user.eq.' + matchedProfile.id + '),' +
+          'and(from_user.eq.' + matchedProfile.id + ',to_user.eq.' + currentProfile.id + ')'
+        )
+        .maybeSingle();
+      if (retry) {
+        currentMatch = retry;
+        await sb.from('match_requests')
+          .update({ status: 'accepted' })
+          .eq('id', retry.id);
+        showAcceptedScreen();
+      }
       return;
     }
-    currentMatch = match;
 
-    // A vede schermata "In attesa che B accetti"
+    currentMatch = match;
     renderWaitingResponse(matchedProfile);
     goTo('waiting-response');
 
   } else {
-    // B sta accettando (currentMatch esiste già) → aggiorna status
+    // currentMatch esiste già → aggiorna status
     await sb.from('match_requests')
       .update({ status: 'accepted' })
       .eq('id', currentMatch.id);
@@ -2196,16 +2229,41 @@ async function requestPhoto() {
   if (!matchedProfile || !currentProfile) return;
   stopMatchTimer();
 
-  // Se non esiste ancora un match_request, crealo ora
+  // Controlla se esiste già un match_request nei due sensi
   if (!currentMatch) {
-    const { data: match, error } = await sb.from('match_requests').insert({
-      from_user: currentProfile.id,
-      to_user: matchedProfile.id,
-      status: 'photo_requested'
-    }).select().single();
+    const { data: existing } = await sb.from('match_requests')
+      .select('*')
+      .or(
+        'and(from_user.eq.' + currentProfile.id + ',to_user.eq.' + matchedProfile.id + '),' +
+        'and(from_user.eq.' + matchedProfile.id + ',to_user.eq.' + currentProfile.id + ')'
+      )
+      .in('status', ['pending', 'photo_requested'])
+      .maybeSingle();
 
-    if (error) { console.error('match insert error:', error); return; }
-    currentMatch = match;
+    if (existing) {
+      currentMatch = existing;
+    } else {
+      const { data: match, error } = await sb.from('match_requests').insert({
+        from_user: currentProfile.id,
+        to_user: matchedProfile.id,
+        status: 'photo_requested'
+      }).select().single();
+
+      if (error) {
+        // Race condition: ricarica
+        const { data: retry } = await sb.from('match_requests')
+          .select('*')
+          .or(
+            'and(from_user.eq.' + currentProfile.id + ',to_user.eq.' + matchedProfile.id + '),' +
+            'and(from_user.eq.' + matchedProfile.id + ',to_user.eq.' + currentProfile.id + ')'
+          )
+          .maybeSingle();
+        if (retry) currentMatch = retry;
+        else return;
+      } else {
+        currentMatch = match;
+      }
+    }
   } else {
     await sb.from('match_requests')
       .update({ status: 'photo_requested' })
