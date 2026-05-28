@@ -1323,19 +1323,30 @@ function toastViewProfile() {
 function toastAccept() {
   if (!toastMatchData) return;
   const { matchData, profile } = toastMatchData;
-  currentMatch = matchData;
+  currentMatch = matchData;   // match_request già esiste nel DB
   matchedProfile = profile;
-  renderMatchScreen(profile);
   dismissToast();
-  acceptMatch();
+  // B accetta → aggiorna status e mostra "È un Match!"
+  sb.from('match_requests')
+    .update({ status: 'accepted' })
+    .eq('id', currentMatch.id)
+    .then(() => showAcceptedScreen());
 }
 
 function toastReject() {
   if (!toastMatchData) return;
   const { matchData } = toastMatchData;
   currentMatch = matchData;
+  matchedProfile = null;
   dismissToast();
-  rejectMatch();
+  // B rifiuta → aggiorna status nel DB e torna in attesa
+  sb.from('match_requests')
+    .update({ status: 'rejected' })
+    .eq('id', currentMatch.id)
+    .then(() => {
+      currentMatch = null;
+      goTo('waiting');
+    });
 }
 
 function toastSendPhoto() {
@@ -1976,28 +1987,12 @@ async function findMatch() {
   // Scegli uno random
   const partner = compatible[Math.floor(Math.random() * compatible.length)];
   matchedProfile = partner;
+  currentMatch = null; // nessun match nel DB ancora
 
-  // Crea il match nel DB
-  const { data: match, error } = await sb.from('match_requests').insert({
-    from_user: currentProfile.id,
-    to_user: partner.id,
-    status: 'pending'
-  }).select().single();
-
-  if (error) {
-    // Match già esiste, carica quello
-    const { data: existing } = await sb.from('match_requests')
-      .select('*').eq('from_user', currentProfile.id).eq('to_user', partner.id).single();
-    currentMatch = existing;
-  } else {
-    currentMatch = match;
-  }
-
+  // Mostra profilo di B ad A con timer 30s per decidere
   renderMatchScreen(partner);
-  // Utente1 (mittente) vede schermata attesa - non la schermata match
-  // La schermata match con timer è per chi RICEVE il match (utente2)
-  goTo('waiting-response');
-  renderWaitingResponse(partner);
+  goTo('match');
+  startMatchTimer();
 }
 
 function isCompatible(me, other) {
@@ -2101,35 +2096,55 @@ function updateTimerUI(t, max) {
 }
 
 async function expireMatch() {
+  // A non ha deciso entro 30s → nessun match_request nel DB da aggiornare
   if (currentMatch) {
-    await sb.from('match_requests').update({ status: 'expired' }).eq('id', currentMatch.id);
+    await sb.from('match_requests')
+      .update({ status: 'expired' })
+      .eq('id', currentMatch.id);
   }
+  currentMatch = null;
+  matchedProfile = null;
   document.getElementById('popupExpired').classList.add('show');
 }
 
 async function rejectMatch() {
   stopMatchTimer();
   if (currentMatch) {
-    await sb.from('match_requests').update({ status: 'rejected' }).eq('id', currentMatch.id);
+    // B rifiuta → aggiorna status nel DB
+    await sb.from('match_requests')
+      .update({ status: 'rejected' })
+      .eq('id', currentMatch.id);
   }
+  // Se A rifiuta prima di mandare la richiesta, non c'è nulla nel DB
+  currentMatch = null;
+  matchedProfile = null;
   document.getElementById('popupReject').classList.add('show');
 }
 
 async function acceptMatch() {
   stopMatchTimer();
-  if (!currentMatch) return;
+  if (!matchedProfile || !currentProfile) return;
 
-  const isReceiver = currentMatch.to_user === currentProfile.id;
+  if (!currentMatch) {
+    // A sta accettando per primo → crea match_request nel DB
+    const { data: match, error } = await sb.from('match_requests').insert({
+      from_user: currentProfile.id,
+      to_user: matchedProfile.id,
+      status: 'pending'
+    }).select().single();
 
-  if (isReceiver) {
-    // Utente2 (ricevente) accetta → aggiorna DB e mostra schermata
-    await sb.from('match_requests')
-      .update({ status: 'accepted' })
-      .eq('id', currentMatch.id);
-    showAcceptedScreen();
+    if (error) {
+      console.error('match insert error:', error);
+      return;
+    }
+    currentMatch = match;
+
+    // A vede schermata "In attesa che B accetti"
+    renderWaitingResponse(matchedProfile);
+    goTo('waiting-response');
+
   } else {
-    // Utente1 (mittente) non dovrebbe mai premere accetta —
-    // ma se succede non mostrare nulla, aspetta la risposta dell'altro
+    // B sta accettando (currentMatch esiste già) → aggiorna status
     await sb.from('match_requests')
       .update({ status: 'accepted' })
       .eq('id', currentMatch.id);
@@ -2178,17 +2193,32 @@ function showAcceptedScreen() {
 // PHOTO REQUEST
 // ============================================================
 async function requestPhoto() {
-  if (!currentMatch || !matchedProfile) return;
+  if (!matchedProfile || !currentProfile) return;
   stopMatchTimer();
 
-  // Crea photo request nel DB
-  const { data: photoReq } = await sb.from('photo_requests').insert({
+  // Se non esiste ancora un match_request, crealo ora
+  if (!currentMatch) {
+    const { data: match, error } = await sb.from('match_requests').insert({
+      from_user: currentProfile.id,
+      to_user: matchedProfile.id,
+      status: 'photo_requested'
+    }).select().single();
+
+    if (error) { console.error('match insert error:', error); return; }
+    currentMatch = match;
+  } else {
+    await sb.from('match_requests')
+      .update({ status: 'photo_requested' })
+      .eq('id', currentMatch.id);
+  }
+
+  // Crea photo request → B riceve toast via postgres_changes
+  await sb.from('photo_requests').insert({
     match_id: currentMatch.id,
     from_user: currentProfile.id,
     to_user: matchedProfile.id
-  }).select().single();
+  });
 
-  // La notifica arriva automaticamente via postgres_changes su photo_requests
   document.getElementById('photoTitle').textContent = 'Stai chiedendo una foto a ' + matchedProfile.name;
   goTo('photo');
   startPhotoTimer();
@@ -2471,22 +2501,24 @@ async function subscribeToMatches() {
       const req = payload.new;
       // L'altro utente ha risposto al nostro match request
       if (req.status === 'accepted') {
-        stopMatchTimer();
-        // Utente1 viene notificato che utente2 ha accettato
+        // A riceve notifica che B ha accettato
         const active = document.querySelector('.screen.active');
         if (active && active.id !== 's-chat' && active.id !== 's-accepted') {
-          // Carica profilo dell'altro utente se non già presente
+          if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
+          currentMatch = req;
+          // Carica profilo di B se non presente
           if (!matchedProfile) {
             const otherId = req.from_user === currentProfile.id ? req.to_user : req.from_user;
             const { data: otherProfile } = await sb.from('profiles')
               .select('*').eq('id', otherId).single();
-            if (otherProfile) matchedProfile = otherProfile;
+            if (otherProfile) { matchedProfile = otherProfile; renderMatchScreen(otherProfile); }
           }
-          currentMatch = req;
           showAcceptedScreen();
         }
       } else if (req.status === 'rejected') {
-        stopMatchTimer();
+        if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
+        currentMatch = null;
+        matchedProfile = null;
         document.getElementById('popupReject').classList.add('show');
       }
     })
