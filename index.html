@@ -1597,19 +1597,27 @@ async function openChatFromList(match, other) {
   if (msgChannel) { sb.removeChannel(msgChannel); msgChannel = null; }
   if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
 
-  // Ricarica il match più recente accettato tra questi due utenti
-  const { data: freshMatch } = await sb.from('match_requests')
+  // Prendi tutti i match accepted e scegli quello con messaggi
+  const { data: allMatches } = await sb.from('match_requests')
     .select('*')
     .or(
       'and(from_user.eq.' + other.id + ',to_user.eq.' + currentProfile.id + '),' +
       'and(from_user.eq.' + currentProfile.id + ',to_user.eq.' + other.id + ')'
     )
     .eq('status', 'accepted')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order('created_at', { ascending: false });
 
-  currentMatch = freshMatch || match;
+  let bestMatch = match;
+  if (allMatches && allMatches.length > 0) {
+    bestMatch = allMatches[0];
+    for (const m of allMatches) {
+      const { count } = await sb.from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('chat_id', m.id);
+      if (count > 0) { bestMatch = m; break; }
+    }
+  }
+  currentMatch = bestMatch;
   matchedProfile = other;
   console.log('[LiveMatch] Opening chat with matchId:', currentMatch.id);
   loadChatScreen();
@@ -2209,22 +2217,28 @@ async function acceptMatch() {
 }
 
 async function enterChat() {
-  // Ricarica il match corretto dal DB prima di aprire la chat
   if (matchedProfile && currentProfile) {
-    const { data: freshMatch } = await sb.from('match_requests')
+    // Prendi TUTTI i match accepted tra questi due utenti
+    const { data: allMatches } = await sb.from('match_requests')
       .select('*')
       .or(
         'and(from_user.eq.' + matchedProfile.id + ',to_user.eq.' + currentProfile.id + '),' +
         'and(from_user.eq.' + currentProfile.id + ',to_user.eq.' + matchedProfile.id + ')'
       )
       .eq('status', 'accepted')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: false });
 
-    if (freshMatch) {
-      currentMatch = freshMatch;
-      console.log('[LiveMatch] Entering chat with correct matchId:', currentMatch.id);
+    if (allMatches && allMatches.length > 0) {
+      // Cerca quello che ha messaggi
+      let bestMatch = allMatches[0];
+      for (const m of allMatches) {
+        const { count } = await sb.from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('chat_id', m.id);
+        if (count > 0) { bestMatch = m; break; }
+      }
+      currentMatch = bestMatch;
+      console.log('[LiveMatch] Entering chat with matchId:', currentMatch.id);
     }
   }
   loadChatScreen();
@@ -2429,7 +2443,7 @@ async function subscribeToMessages() {
   if (!currentMatch || !currentProfile) return;
 
   const chatId = currentMatch.id;
-  let lastMsgTime = new Date(0).toISOString();
+  let knownMsgIds = new Set();
 
   // Carica tutti i messaggi esistenti
   async function loadAllMessages() {
@@ -2451,6 +2465,7 @@ async function subscribeToMessages() {
 
     if (data && data.length > 0) {
       for (const m of data) {
+        knownMsgIds.add(m.id);
         if (m.sender_id !== currentProfile.id) {
           const { data: sender } = await sb.from('profiles')
             .select('name,avatar_url').eq('id', m.sender_id).single();
@@ -2460,28 +2475,29 @@ async function subscribeToMessages() {
         }
         renderMessage(m);
       }
-      lastMsgTime = data[data.length - 1].created_at;
     }
   }
 
-  // Polling: controlla nuovi messaggi ogni 2s
+  // Polling: controlla nuovi messaggi ogni 1s usando gli ID come riferimento
   async function pollNewMessages() {
     if (!currentMatch || currentMatch.id !== chatId) return;
     const { data } = await sb.from('messages')
       .select('*')
       .eq('chat_id', chatId)
-      .gt('created_at', lastMsgTime)
       .order('created_at', { ascending: true });
 
     if (data && data.length > 0) {
-      hideTyping();
-      for (const m of data) {
-        if (m.sender_id === currentProfile.id) continue; // già mostrato localmente
-        const { data: sender } = await sb.from('profiles')
-          .select('name,avatar_url').eq('id', m.sender_id).single();
-        m.sender = sender;
-        renderMessage(m);
-        lastMsgTime = m.created_at;
+      const newMsgs = data.filter(m => !knownMsgIds.has(m.id));
+      if (newMsgs.length > 0) {
+        hideTyping();
+        for (const m of newMsgs) {
+          knownMsgIds.add(m.id);
+          if (m.sender_id === currentProfile.id) continue;
+          const { data: sender } = await sb.from('profiles')
+            .select('name,avatar_url').eq('id', m.sender_id).single();
+          m.sender = sender;
+          renderMessage(m);
+        }
       }
     }
   }
