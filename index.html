@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <title>LiveMatch</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
@@ -27,12 +27,43 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
+  /* Disabilita selezione testo e touch callout su mobile */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  /* Disabilita tap highlight */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Permetti selezione solo negli input */
+input, textarea {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+/* App occupa tutto lo schermo su mobile */
+@media (max-width: 430px) {
+  body {
+    align-items: flex-start;
+    background: var(--surface);
+  }
+  #app {
+    width: 100vw !important;
+    min-height: 100vh !important;
+    min-height: -webkit-fill-available !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
 }
 body::before {
   content: '';
@@ -45,32 +76,18 @@ body::before {
   z-index: 0;
 }
 #app {
-  width: 390px;
-  min-height: 780px;
+  width: 100vw;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
   background: var(--surface);
-  border-radius: 40px;
-  border: 0.5px solid var(--border2);
+  border-radius: 0;
+  border: none;
   overflow: hidden;
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 40px 120px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.08);
-}
-.notch {
-  width: 100px; height: 28px;
-  background: var(--bg);
-  border-radius: 0 0 20px 20px;
-  margin: 0 auto;
-  flex-shrink: 0;
-}
-.statusbar {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 20px;
-  font-size: 11px;
-  color: var(--text2);
-  flex-shrink: 0;
+  box-shadow: none;
 }
 .screen { display: none; flex-direction: column; flex: 1; overflow: hidden; }
 .screen.active { display: flex; animation: slideUp 0.28s ease; }
@@ -120,6 +137,10 @@ body::before {
   background:var(--accent);color:#fff;border:none;
   font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;
   cursor:pointer;transition:transform 0.1s,opacity 0.1s;letter-spacing:0.2px;
+  /* Mobile touch ottimizzazioni */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  min-height: 48px;
 }
 .btn-primary:hover{opacity:0.9}
 .btn-primary:active{transform:scale(0.98)}
@@ -634,6 +655,47 @@ body::before {
   color:var(--accent);font-weight:700;
 }
 
+
+/* ---- REPORT/BLOCCA ---- */
+.report-btn {
+  width:100%;padding:10px;border-radius:var(--r);
+  background:transparent;border:0.5px solid rgba(255,77,109,0.2);
+  color:var(--text3);font-family:'DM Sans',sans-serif;font-size:12px;
+  cursor:pointer;transition:all 0.15s;display:flex;align-items:center;
+  justify-content:center;gap:6px;
+}
+.report-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ---- FILTRI PROFILO ---- */
+.filter-section{display:flex;flex-direction:column;gap:10px;}
+.filter-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.filter-row label{font-size:13px;color:var(--text2);flex-shrink:0;}
+.range-wrap{display:flex;align-items:center;gap:8px;flex:1;}
+.range-wrap input[type=range]{flex:1;accent-color:var(--accent);}
+.range-val{font-size:12px;color:var(--accent);font-weight:500;min-width:32px;text-align:right;}
+
+/* ---- VERIFICA EMAIL ---- */
+.verify-banner{
+  background:rgba(255,140,0,0.1);border:0.5px solid rgba(255,140,0,0.3);
+  border-radius:var(--r);padding:10px 14px;
+  font-size:12px;color:#ffaa44;
+  display:flex;align-items:center;gap:8px;
+}
+.verify-banner button{
+  background:rgba(255,140,0,0.2);border:0.5px solid rgba(255,140,0,0.4);
+  border-radius:8px;padding:4px 10px;color:#ffaa44;
+  font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;
+  white-space:nowrap;
+}
+
+/* ---- DAILY LIMIT ---- */
+.limit-badge{
+  background:rgba(255,77,109,0.1);border:0.5px solid rgba(255,77,109,0.2);
+  border-radius:20px;padding:4px 12px;
+  font-size:12px;color:var(--accent2);
+  text-align:center;
+}
+
 /* ---- LOADING ---- */
 #loading{
   position:fixed;inset:0;background:var(--bg);
@@ -660,10 +722,53 @@ body::before {
 </div>
 
 <div id="app" style="display:none;">
-  <div class="notch"></div>
-  <div class="statusbar">
-    <span id="clock">--:--</span>
-    <span>●●● 🔋</span>
+
+  <!-- POPUP CHAT MENU -->
+  <div class="popup-bg" id="popupChatMenu">
+    <div class="popup-card">
+      <div class="popup-title" id="chatMenuName">Opzioni</div>
+      <button class="btn-ghost" onclick="closePopup('popupChatMenu');blockUser()">🚫 Blocca utente</button>
+      <button class="btn-ghost" onclick="closePopup('popupChatMenu');reportUserFromChat()">🚩 Segnala utente</button>
+      <button class="btn-ghost" onclick="closePopup('popupChatMenu')">Annulla</button>
+    </div>
+  </div>
+
+  <!-- POPUP REPORT -->
+  <div class="popup-bg" id="popupReport">
+    <div class="popup-card">
+      <div class="popup-emoji">🚩</div>
+      <div class="popup-title">Segnala utente</div>
+      <div class="popup-sub">Perché vuoi segnalare questa persona?</div>
+      <select id="reportReason" style="background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--r);padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;width:100%">
+        <option value="inappropriate">Contenuto inappropriato</option>
+        <option value="fake">Profilo falso</option>
+        <option value="spam">Spam</option>
+        <option value="harassment">Molestie</option>
+        <option value="other">Altro</option>
+      </select>
+      <button class="btn-primary" onclick="submitReport()">Invia segnalazione</button>
+      <button class="btn-ghost" onclick="closePopup('popupReport')">Annulla</button>
+    </div>
+  </div>
+
+  <!-- POPUP BLOCCATO -->
+  <div class="popup-bg" id="popupBlocked">
+    <div class="popup-card">
+      <div class="popup-emoji">🚫</div>
+      <div class="popup-title">Utente bloccato</div>
+      <div class="popup-sub">Non vedrai più questa persona nei match.</div>
+      <button class="btn-primary" onclick="closePopup('popupBlocked');goHome()">Ok</button>
+    </div>
+  </div>
+
+  <!-- POPUP LIMITE GIORNALIERO -->
+  <div class="popup-bg" id="popupDailyLimit">
+    <div class="popup-card">
+      <div class="popup-emoji">⏳</div>
+      <div class="popup-title">Limite raggiunto</div>
+      <div class="popup-sub">Hai raggiunto il limite di 10 match al giorno. Torna domani!</div>
+      <button class="btn-primary" onclick="closePopup('popupDailyLimit')">Ok</button>
+    </div>
   </div>
 
   <!-- POPUP RIFIUTO -->
@@ -817,6 +922,15 @@ body::before {
       <div class="live-pill"><div class="live-dot"></div>LIVE</div>
     </div>
     <div class="body">
+      <!-- Banner verifica email -->
+      <div class="verify-banner" id="verifyBanner" style="display:none;width:100%">
+        📧 Verifica la tua email per fare match!
+        <button onclick="resendVerification()">Invia email</button>
+      </div>
+
+      <!-- Limite match giornaliero -->
+      <div class="limit-badge" id="limitBadge" style="display:none"></div>
+
       <div class="radar-wrap">
         <div class="radar-ring"></div>
         <div class="radar-ring"></div>
@@ -888,6 +1002,7 @@ body::before {
       </div>
       <button class="btn-photo" onclick="requestPhoto()">📸 Chiedi una foto dal vivo</button>
       <div style="font-size:11px;color:var(--text3);text-align:center;">Il match scade automaticamente in 30s</div>
+      <button class="report-btn" onclick="reportUser()">🚩 Segnala questo utente</button>
     </div>
   </div>
 
@@ -992,7 +1107,7 @@ body::before {
         <div class="accepted-av" id="acceptedAvThem" style="background:linear-gradient(135deg,#f77f8a,#e64b6b)"></div>
       </div>
       <div class="accepted-sub" id="acceptedSub">Tu e qualcuno vi siete piaciuti!</div>
-      <button class="btn-primary" id="btnGoChat" onclick="enterChat()">💬 Inizia a chattare</button>
+      <button class="btn-primary" id="btnGoChat" onclick="enterChat()" ontouchend="event.preventDefault();enterChat()">💬 Inizia a chattare</button>
     </div>
   </div>
 
@@ -1024,6 +1139,31 @@ body::before {
         </div>
       </div>
       <input type="file" id="editPhotoInput" accept="image/*" style="display:none" onchange="handleEditPhoto(event)"/>
+
+      <div class="section-label">Filtri di ricerca</div>
+      <div class="filter-section">
+        <div class="filter-row">
+          <label>Età min</label>
+          <div class="range-wrap">
+            <input type="range" id="editMinAge" min="18" max="99" value="18" oninput="document.getElementById('minAgeVal').textContent=this.value"/>
+            <span class="range-val" id="minAgeVal">18</span>
+          </div>
+        </div>
+        <div class="filter-row">
+          <label>Età max</label>
+          <div class="range-wrap">
+            <input type="range" id="editMaxAge" min="18" max="99" value="99" oninput="document.getElementById('maxAgeVal').textContent=this.value"/>
+            <span class="range-val" id="maxAgeVal">99</span>
+          </div>
+        </div>
+        <div class="filter-row">
+          <label>Distanza max</label>
+          <div class="range-wrap">
+            <input type="range" id="editMaxDist" min="5" max="500" value="50" oninput="document.getElementById('maxDistVal').textContent=this.value+'km'"/>
+            <span class="range-val" id="maxDistVal">50km</span>
+          </div>
+        </div>
+      </div>
 
       <div class="section-label">Informazioni</div>
       <div class="field"><label>NOME</label><input type="text" id="editName" placeholder="Il tuo nome"/></div>
@@ -1219,6 +1359,136 @@ function vibrate(pattern) {
   if (navigator.vibrate) navigator.vibrate(pattern);
 }
 
+
+// ============================================================
+// VERIFICA EMAIL
+// ============================================================
+async function checkEmailVerified() {
+  if (!currentUser) return true;
+  const { data: { user } } = await sb.auth.getUser();
+  const verified = user?.email_confirmed_at != null;
+  const banner = document.getElementById('verifyBanner');
+  if (banner) banner.style.display = verified ? 'none' : 'flex';
+  return verified;
+}
+
+async function resendVerification() {
+  if (!currentUser) return;
+  await sb.auth.resend({ type: 'signup', email: currentUser.email });
+  alert('Email di verifica inviata! Controlla la tua casella.');
+}
+
+// ============================================================
+// LIMITE MATCH GIORNALIERO
+// ============================================================
+const DAILY_LIMIT = 10;
+
+async function checkDailyLimit() {
+  if (!currentProfile) return true;
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Reset se è un nuovo giorno
+  if (currentProfile.last_match_date !== today) {
+    await sb.from('profiles').update({ daily_matches: 0, last_match_date: today }).eq('id', currentProfile.id);
+    currentProfile.daily_matches = 0;
+    currentProfile.last_match_date = today;
+  }
+
+  const badge = document.getElementById('limitBadge');
+  const remaining = DAILY_LIMIT - (currentProfile.daily_matches || 0);
+  if (badge) {
+    if (remaining <= 3) {
+      badge.style.display = 'block';
+      badge.textContent = remaining > 0 ? remaining + ' match rimanenti oggi' : 'Limite giornaliero raggiunto';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if ((currentProfile.daily_matches || 0) >= DAILY_LIMIT) {
+    document.getElementById('popupDailyLimit').classList.add('show');
+    return false;
+  }
+  return true;
+}
+
+async function incrementDailyMatches() {
+  if (!currentProfile) return;
+  const newCount = (currentProfile.daily_matches || 0) + 1;
+  await sb.from('profiles').update({ daily_matches: newCount }).eq('id', currentProfile.id);
+  currentProfile.daily_matches = newCount;
+}
+
+// ============================================================
+// REPORT / BLOCCA
+// ============================================================
+let reportTargetId = null;
+
+function reportUser() {
+  if (!matchedProfile) return;
+  reportTargetId = matchedProfile.id;
+  document.getElementById('popupReport').classList.add('show');
+}
+
+function reportUserFromChat() {
+  if (!matchedProfile) return;
+  reportTargetId = matchedProfile.id;
+  document.getElementById('popupReport').classList.add('show');
+}
+
+async function submitReport() {
+  if (!reportTargetId || !currentProfile) return;
+  const reason = document.getElementById('reportReason').value;
+  await sb.from('reports').insert({
+    reporter_id: currentProfile.id,
+    reported_id: reportTargetId,
+    reason
+  });
+  closePopup('popupReport');
+  reportTargetId = null;
+  alert('Segnalazione inviata. Grazie!');
+}
+
+async function blockUser() {
+  if (!matchedProfile || !currentProfile) return;
+  await sb.from('blocks').insert({
+    blocker_id: currentProfile.id,
+    blocked_id: matchedProfile.id
+  });
+  document.getElementById('popupBlocked').classList.add('show');
+}
+
+function showChatMenu() {
+  if (!matchedProfile) return;
+  document.getElementById('chatMenuName').textContent = matchedProfile.name;
+  document.getElementById('popupChatMenu').classList.add('show');
+}
+
+// ============================================================
+// GEOLOCALIZZAZIONE
+// ============================================================
+function requestLocation() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    if (currentUser) {
+      await sb.from('profiles').update({ latitude: lat, longitude: lng }).eq('id', currentUser.id);
+      if (currentProfile) { currentProfile.latitude = lat; currentProfile.longitude = lng; }
+    }
+  }, () => {});
+}
+
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLon = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+    Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*
+    Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
 // ============================================================
 // TOAST NOTIFICATION SYSTEM
 // ============================================================
@@ -1381,6 +1651,14 @@ function openEditProfile() {
   document.getElementById('editLookingFor').value = p.looking_for || 'entrambi';
   document.getElementById('editBio').value = p.bio || '';
 
+  // Precompila filtri
+  const minAgeEl = document.getElementById('editMinAge');
+  const maxAgeEl = document.getElementById('editMaxAge');
+  const maxDistEl = document.getElementById('editMaxDist');
+  if (minAgeEl) { minAgeEl.value = p.min_age || 18; document.getElementById('minAgeVal').textContent = p.min_age || 18; }
+  if (maxAgeEl) { maxAgeEl.value = p.max_age || 99; document.getElementById('maxAgeVal').textContent = p.max_age || 99; }
+  if (maxDistEl) { maxDistEl.value = p.max_distance || 50; document.getElementById('maxDistVal').textContent = (p.max_distance || 50) + 'km'; }
+
   // Foto
   editPhotos = [null, null, null];
   const urls = [
@@ -1458,7 +1736,10 @@ async function saveEditProfile() {
 
   btn.disabled = true; btn.textContent = 'Salvataggio…';
 
-  const updates = { name, age, city, gender, orientation, looking_for, bio };
+  const minAge = parseInt(document.getElementById('editMinAge')?.value || 18);
+  const maxAge = parseInt(document.getElementById('editMaxAge')?.value || 99);
+  const maxDist = parseInt(document.getElementById('editMaxDist')?.value || 50);
+  const updates = { name, age, city, gender, orientation, looking_for, bio, min_age: minAge, max_age: maxAge, max_distance: maxDist };
 
   // Upload foto se cambiate
   const bucketFields = ['avatar_url', 'photo2_url', 'photo3_url'];
@@ -1629,9 +1910,6 @@ async function openChatFromList(match, other) {
 // INIT
 // ============================================================
 async function init() {
-  updateClock();
-  setInterval(updateClock, 10000);
-
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
     currentUser = session.user;
@@ -1655,11 +1933,6 @@ async function init() {
   });
 }
 
-function updateClock() {
-  const n = new Date();
-  document.getElementById('clock').textContent =
-    String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
-}
 
 // ============================================================
 // NAVIGATION
@@ -1878,6 +2151,15 @@ async function setupOnlinePresence() {
   if (window._onlinePoller) clearInterval(window._onlinePoller);
   window._onlinePoller = setInterval(loadOnlineCount, 2000);
 
+  // Richiedi posizione GPS
+  requestLocation();
+
+  // Controlla verifica email
+  checkEmailVerified();
+
+  // Controlla limite giornaliero
+  checkDailyLimit();
+
   // Tenta setOffline anche su beforeunload (funziona su desktop)
   window.removeEventListener('beforeunload', setOffline);
   window.addEventListener('beforeunload', setOffline);
@@ -1948,6 +2230,18 @@ async function loadOnlineCount() {
 // ============================================================
 async function findMatch() {
   if (!currentProfile) return;
+
+  // Controlla verifica email
+  const verified = await checkEmailVerified();
+  if (!verified) {
+    document.getElementById('verifyBanner').style.display = 'flex';
+    return;
+  }
+
+  // Controlla limite giornaliero
+  const withinLimit = await checkDailyLimit();
+  if (!withinLimit) return;
+
   goTo('searching');
 
   const msgs = ['Cercando utenti online…','Scansione in corso…','Trovando qualcuno compatibile…','Quasi lì…'];
@@ -1977,13 +2271,13 @@ async function findMatch() {
     return;
   }
 
-  // Carica ID delle persone già incontrate (se toggle OFF)
+  // Carica ID persone già incontrate
   let seenIds = new Set();
   const allowRematch = document.getElementById('toggleRematch')?.checked || false;
   if (!allowRematch) {
     const { data: pastMatches } = await sb.from('match_requests')
       .select('from_user, to_user')
-      .or(`from_user.eq.${currentProfile.id},to_user.eq.${currentProfile.id}`)
+      .or('from_user.eq.' + currentProfile.id + ',to_user.eq.' + currentProfile.id)
       .in('status', ['accepted', 'rejected', 'expired']);
     if (pastMatches) {
       pastMatches.forEach(m => {
@@ -1992,10 +2286,37 @@ async function findMatch() {
     }
   }
 
-  // Filtra per compatibilità orientamento e persone già incontrate
-  const compatible = candidates.filter(c =>
-    isCompatible(currentProfile, c) && !seenIds.has(c.id)
-  );
+  // Carica ID utenti bloccati
+  const { data: blockedUsers } = await sb.from('blocks')
+    .select('blocked_id')
+    .eq('blocker_id', currentProfile.id);
+  const blockedIds = new Set((blockedUsers || []).map(b => b.blocked_id));
+
+  // Carica chi ci ha bloccato
+  const { data: blockedByUsers } = await sb.from('blocks')
+    .select('blocker_id')
+    .eq('blocked_id', currentProfile.id);
+  const blockedByIds = new Set((blockedByUsers || []).map(b => b.blocker_id));
+
+  // Filtra candidati
+  const minAge = currentProfile.min_age || 18;
+  const maxAge = currentProfile.max_age || 99;
+  const maxDist = currentProfile.max_distance || 50;
+
+  const compatible = candidates.filter(c => {
+    if (!isCompatible(currentProfile, c)) return false;
+    if (seenIds.has(c.id)) return false;
+    if (blockedIds.has(c.id)) return false;
+    if (blockedByIds.has(c.id)) return false;
+    // Filtro età
+    if (c.age < minAge || c.age > maxAge) return false;
+    // Filtro distanza (se entrambi hanno posizione)
+    if (currentProfile.latitude && c.latitude && maxDist < 500) {
+      const dist = getDistanceKm(currentProfile.latitude, currentProfile.longitude, c.latitude, c.longitude);
+      if (dist > maxDist) return false;
+    }
+    return true;
+  });
 
   if (compatible.length === 0) {
     const allowRematch2 = document.getElementById('toggleRematch')?.checked || false;
@@ -2038,6 +2359,12 @@ function renderMatchScreen(p) {
   document.getElementById('matchName').textContent = p.name + ', ' + p.age;
   document.getElementById('matchAge').textContent = p.age + ' anni';
   document.getElementById('matchCity').textContent = p.city;
+  // Mostra distanza se disponibile
+  if (currentProfile?.latitude && p.latitude) {
+    const dist = Math.round(getDistanceKm(currentProfile.latitude, currentProfile.longitude, p.latitude, p.longitude));
+    const cityEl = document.getElementById('matchCity');
+    if (cityEl) cityEl.textContent = p.city + ' · ' + dist + 'km';
+  }
   document.getElementById('matchBio').textContent = p.bio || '';
 }
 
@@ -2204,6 +2531,7 @@ async function acceptMatch() {
     }
 
     currentMatch = match;
+    await incrementDailyMatches();
     renderWaitingResponse(matchedProfile);
     goTo('waiting-response');
 
@@ -2217,7 +2545,14 @@ async function acceptMatch() {
 }
 
 async function enterChat() {
-  if (matchedProfile && currentProfile) {
+  console.log('[LiveMatch] enterChat called, matchedProfile:', matchedProfile?.name, 'currentProfile:', currentProfile?.name);
+  
+  // Previeni doppi tap
+  const btn = document.getElementById('btnGoChat');
+  if (btn) { btn.disabled = true; btn.textContent = 'Caricamento…'; }
+
+  try {
+    if (matchedProfile && currentProfile) {
     // Prendi TUTTI i match accepted tra questi due utenti
     const { data: allMatches } = await sb.from('match_requests')
       .select('*')
@@ -2244,6 +2579,10 @@ async function enterChat() {
   loadChatScreen();
   goTo('chat');
   await subscribeToMessages();
+  } catch(e) {
+    console.error('[LiveMatch] enterChat error:', e);
+    if (btn) { btn.disabled = false; btn.textContent = '💬 Inizia a chattare'; }
+  }
 }
 
 function showAcceptedScreen() {
