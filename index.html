@@ -992,7 +992,7 @@ body::before {
         <div class="accepted-av" id="acceptedAvThem" style="background:linear-gradient(135deg,#f77f8a,#e64b6b)"></div>
       </div>
       <div class="accepted-sub" id="acceptedSub">Tu e qualcuno vi siete piaciuti!</div>
-      <button class="btn-primary" id="btnGoChat" onclick="goTo('chat')">💬 Inizia a chattare</button>
+      <button class="btn-primary" id="btnGoChat" onclick="enterChat()">💬 Inizia a chattare</button>
     </div>
   </div>
 
@@ -1594,10 +1594,24 @@ function formatTime(date) {
 }
 
 async function openChatFromList(match, other) {
-  // Rimuovi canale precedente
   if (msgChannel) { sb.removeChannel(msgChannel); msgChannel = null; }
-  currentMatch = match;
+  if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
+
+  // Ricarica il match più recente accettato tra questi due utenti
+  const { data: freshMatch } = await sb.from('match_requests')
+    .select('*')
+    .or(
+      'and(from_user.eq.' + other.id + ',to_user.eq.' + currentProfile.id + '),' +
+      'and(from_user.eq.' + currentProfile.id + ',to_user.eq.' + other.id + ')'
+    )
+    .eq('status', 'accepted')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  currentMatch = freshMatch || match;
   matchedProfile = other;
+  console.log('[LiveMatch] Opening chat with matchId:', currentMatch.id);
   loadChatScreen();
   goTo('chat');
   await subscribeToMessages();
@@ -2194,6 +2208,30 @@ async function acceptMatch() {
   }
 }
 
+async function enterChat() {
+  // Ricarica il match corretto dal DB prima di aprire la chat
+  if (matchedProfile && currentProfile) {
+    const { data: freshMatch } = await sb.from('match_requests')
+      .select('*')
+      .or(
+        'and(from_user.eq.' + matchedProfile.id + ',to_user.eq.' + currentProfile.id + '),' +
+        'and(from_user.eq.' + currentProfile.id + ',to_user.eq.' + matchedProfile.id + ')'
+      )
+      .eq('status', 'accepted')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (freshMatch) {
+      currentMatch = freshMatch;
+      console.log('[LiveMatch] Entering chat with correct matchId:', currentMatch.id);
+    }
+  }
+  loadChatScreen();
+  goTo('chat');
+  await subscribeToMessages();
+}
+
 function showAcceptedScreen() {
   // Avatar mio
   const meAv = document.getElementById('acceptedAvMe');
@@ -2228,14 +2266,8 @@ function showAcceptedScreen() {
   vibrate([100, 50, 200]);
   goTo('accepted');
 
-  // Salva chat attiva in localStorage per persistenza
-  if (currentMatch) {
-    localStorage.setItem('lm_active_chat', currentMatch.id);
-    if (matchedProfile) localStorage.setItem('lm_matched_profile', JSON.stringify(matchedProfile));
-  }
-  // Prepara chat in background
-  loadChatScreen();
-  subscribeToMessages();
+  // Salva profilo match in localStorage per persistenza
+  if (matchedProfile) localStorage.setItem('lm_matched_profile', JSON.stringify(matchedProfile));
 }
 
 // ============================================================
@@ -2564,14 +2596,9 @@ function hideTyping() {
   if (row) row.classList.remove('show');
 }
 
-// Invia evento typing quando l'utente scrive
+// Typing indicator disabilitato (usava broadcast che causa warning)
 function handleChatInput() {
-  if (!currentMatch || !currentProfile) return;
-  sb.channel('typing-' + currentMatch.id).send({
-    type: 'broadcast',
-    event: 'typing',
-    payload: { user_id: currentProfile.id }
-  }).catch(() => {});
+  // noop - rimosso broadcast
 }
 
 async function subscribeToMatches() {
