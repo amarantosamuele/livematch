@@ -34,6 +34,11 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
+  /* Padding safe area per iOS */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   /* Disabilita selezione testo e touch callout su mobile */
   -webkit-user-select: none;
   user-select: none;
@@ -76,7 +81,7 @@ body::before {
   z-index: 0;
 }
 #app {
-  width: 100vw;
+  width: 100%;
   min-height: 100vh;
   min-height: -webkit-fill-available;
   background: var(--surface);
@@ -96,7 +101,9 @@ body::before {
 /* ---- TOPBAR ---- */
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px; flex-shrink: 0;
+  padding: 12px 20px;
+  padding-top: max(12px, env(safe-area-inset-top));
+  flex-shrink: 0;
 }
 .logo { font-family: 'DM Serif Display', serif; font-size: 22px; }
 .logo span { color: var(--accent); font-style: italic; }
@@ -111,7 +118,7 @@ body::before {
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
 
 /* ---- FORMS ---- */
-.form-body { flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px; }
+.form-body { flex:1;overflow-y:auto;padding:20px;padding-bottom:max(20px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px; }
 .form-body::-webkit-scrollbar{width:3px}
 .form-body::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
 .form-title { font-family:'DM Serif Display',serif;font-size:26px;line-height:1.2;margin-bottom:4px; }
@@ -323,7 +330,9 @@ body::before {
 @keyframes tdot{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
 .input-row{
   display:flex;align-items:center;gap:8px;
-  padding:10px 14px;border-top:0.5px solid var(--border);flex-shrink:0;
+  padding:10px 14px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  border-top:0.5px solid var(--border);flex-shrink:0;
 }
 .input-row input{
   flex:1;background:var(--surface2);border:0.5px solid var(--border2);
@@ -388,7 +397,9 @@ body::before {
 /* ---- BOTTOM NAV ---- */
 .bottom-nav{
   display:flex;align-items:center;justify-content:space-around;
-  padding:10px 16px;border-top:0.5px solid var(--border);flex-shrink:0;
+  padding:10px 16px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  border-top:0.5px solid var(--border);flex-shrink:0;
 }
 .nav-item{
   display:flex;flex-direction:column;align-items:center;gap:3px;
@@ -694,6 +705,32 @@ body::before {
   border-radius:20px;padding:4px 12px;
   font-size:12px;color:var(--accent2);
   text-align:center;
+}
+
+
+/* ===== iOS SAFE AREA ===== */
+/* Applica safe area a tutti i topbar */
+.topbar, .chat-topbar {
+  padding-top: max(12px, env(safe-area-inset-top)) !important;
+}
+/* Safe area bottom per schermate con input */
+.input-bar {
+  padding-bottom: max(28px, calc(env(safe-area-inset-bottom) + 12px)) !important;
+}
+/* Schermata auth e form */
+#s-auth .form-body,
+#s-register .form-body,
+#s-onboard .body,
+#s-edit .body {
+  padding-bottom: max(20px, calc(env(safe-area-inset-bottom) + 20px));
+}
+/* Schermate senza bottom nav */
+#s-searching,
+#s-match,
+#s-photo,
+#s-accepted,
+#s-waiting-response {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* ---- LOADING ---- */
@@ -1113,7 +1150,7 @@ body::before {
 
   <!-- ===== EDIT PROFILE ===== -->
   <div class="screen" id="s-edit">
-    <div class="topbar" style="border-bottom:0.5px solid var(--border);">
+    <div class="topbar" style="border-bottom:0.5px solid var(--border);padding-top:max(12px,env(safe-area-inset-top));">
       <button onclick="goTo('profile')" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
       <div style="font-size:14px;font-weight:500;">Modifica profilo</div>
       <div style="width:24px"></div>
@@ -2717,31 +2754,63 @@ function handlePhotoCapture(e) {
   const file = e.target.files[0];
   if (!file) return;
   photoCapturedFile = file;
-  const url = URL.createObjectURL(file);
-  document.getElementById('camDefault').style.display = 'none';
-  const preview = document.getElementById('photoPreview');
-  preview.src = url;
-  preview.style.display = 'block';
-  document.getElementById('cameraFrame').classList.add('captured');
-  document.getElementById('btnSendPhoto').style.display = 'block';
+
+  // Usa FileReader per compatibilità iOS invece di createObjectURL
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById('camDefault').style.display = 'none';
+    const preview = document.getElementById('photoPreview');
+    preview.src = ev.target.result;
+    preview.style.display = 'block';
+    document.getElementById('cameraFrame').classList.add('captured');
+    const btn = document.getElementById('btnSendPhoto');
+    if (btn) { btn.style.display = 'block'; btn.disabled = false; btn.textContent = 'Invia foto e vai alla chat →'; }
+  };
+  reader.readAsDataURL(file);
 }
 
 async function sendLivePhoto() {
   stopPhotoTimer();
 
-  // Vai sempre in chat, anche se upload fallisce
-  loadChatScreen();
-  goTo('chat');
-  await subscribeToMessages();
+  if (!photoCapturedFile || !currentMatch || !currentProfile) {
+    loadChatScreen();
+    goTo('chat');
+    await subscribeToMessages();
+    return;
+  }
 
-  if (!photoCapturedFile || !currentMatch) return;
+  // Mostra loading sul pulsante
+  const btn = document.getElementById('btnSendPhoto');
+  if (btn) { btn.disabled = true; btn.textContent = 'Invio in corso…'; }
 
-  // Upload foto in background dopo essere già in chat
   try {
-    const ext = photoCapturedFile.name.split('.').pop() || 'jpg';
+    // Converti il file in ArrayBuffer per compatibilità iOS
+    const arrayBuffer = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(photoCapturedFile);
+    });
+
+    // Determina il tipo MIME
+    const mimeType = photoCapturedFile.type || 'image/jpeg';
+    const ext = mimeType.includes('png') ? 'png' : 'jpg';
     const path = currentMatch.id + '/' + currentProfile.id + '-' + Date.now() + '.' + ext;
-    const { error } = await sb.storage.from('live-photos').upload(path, photoCapturedFile);
-    if (!error) {
+
+    // Upload con ArrayBuffer invece di File (più compatibile con iOS)
+    const { data: uploadData, error: uploadError } = await sb.storage
+      .from('live-photos')
+      .upload(path, arrayBuffer, {
+        contentType: mimeType,
+        upsert: true
+      });
+
+    // Vai in chat indipendentemente dall'esito upload
+    loadChatScreen();
+    goTo('chat');
+    await subscribeToMessages();
+
+    if (!uploadError) {
       const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
       await sb.from('messages').insert({
         chat_id: currentMatch.id,
@@ -2749,9 +2818,16 @@ async function sendLivePhoto() {
         content: urlData.publicUrl,
         type: 'photo'
       });
+    } else {
+      console.error('Photo upload error:', uploadError);
     }
+
   } catch(e) {
-    console.error('Photo upload error:', e);
+    console.error('sendLivePhoto error:', e);
+    // Vai in chat anche se upload fallisce
+    loadChatScreen();
+    goTo('chat');
+    await subscribeToMessages();
   }
 }
 
@@ -2925,15 +3001,37 @@ async function sendMessage() {
 
 async function sendPhotoMessage(e) {
   const file = e.target.files[0];
-  if (!file || !currentMatch) return;
-  const ext = file.name.split('.').pop() || 'jpg';
-  const path = `${currentMatch.id}/chat-${currentProfile.id}-${Date.now()}.${ext}`;
-  const { error } = await sb.storage.from('live-photos').upload(path, file);
-  if (!error) {
-    const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
-    const msg = { chat_id: currentMatch.id, sender_id: currentProfile.id, content: urlData.publicUrl, type: 'photo' };
-    renderMessage({ ...msg, sender: currentProfile, created_at: new Date().toISOString() });
-    await sb.from('messages').insert(msg);
+  if (!file || !currentMatch || !currentProfile) return;
+
+  try {
+    const arrayBuffer = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+
+    const mimeType = file.type || 'image/jpeg';
+    const ext = mimeType.includes('png') ? 'png' : 'jpg';
+    const path = currentMatch.id + '/chat-' + currentProfile.id + '-' + Date.now() + '.' + ext;
+
+    const { error } = await sb.storage.from('live-photos').upload(path, arrayBuffer, {
+      contentType: mimeType, upsert: true
+    });
+
+    if (!error) {
+      const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
+      const msg = {
+        chat_id: currentMatch.id,
+        sender_id: currentProfile.id,
+        content: urlData.publicUrl,
+        type: 'photo'
+      };
+      renderMessage({ ...msg, sender: currentProfile, created_at: new Date().toISOString() });
+      await sb.from('messages').insert(msg);
+    }
+  } catch(e) {
+    console.error('sendPhotoMessage error:', e);
   }
 }
 
