@@ -2830,16 +2830,19 @@ function handlePhotoCapture(e) {
 
 async function sendLivePhoto() {
   stopPhotoTimer();
+  const btn = document.getElementById('btnSendPhoto');
 
   if (!photoCapturedFile || !currentMatch || !currentProfile) {
+    console.log('[Photo] Missing:', !photoCapturedFile, !currentMatch, !currentProfile);
     goTo('waiting');
     return;
   }
 
-  const btn = document.getElementById('btnSendPhoto');
   if (btn) { btn.disabled = true; btn.textContent = 'Invio in corso…'; }
 
   try {
+    console.log('[Photo] Starting upload, matchId:', currentMatch.id);
+
     // Converti in ArrayBuffer per iOS
     const arrayBuffer = await new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -2852,94 +2855,122 @@ async function sendLivePhoto() {
     const ext = mimeType.includes('png') ? 'png' : 'jpg';
     const path = currentMatch.id + '/' + currentProfile.id + '-' + Date.now() + '.' + ext;
 
+    console.log('[Photo] Uploading to path:', path);
+
     const { error: uploadError } = await sb.storage
       .from('live-photos')
       .upload(path, arrayBuffer, { contentType: mimeType, upsert: true });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('[Photo] Upload error:', uploadError);
+      throw uploadError;
+    }
 
     const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
     const myPhotoUrl = urlData.publicUrl;
+    console.log('[Photo] Uploaded OK:', myPhotoUrl);
 
-    // Salva la mia foto nel photo_request
-    // from_user = chi ha chiesto (A), to_user = chi risponde (B)
-    const iAmRequester = currentMatch.from_user === currentProfile.id;
-
-    if (iAmRequester) {
-      // A ha scattato la sua foto → aggiorna requester_photo_url
-      await sb.from('photo_requests')
-        .update({ requester_photo_url: myPhotoUrl })
-        .eq('match_id', currentMatch.id)
-        .eq('from_user', currentProfile.id);
-    } else {
-      // B ha scattato la sua foto → aggiorna photo_url
-      await sb.from('photo_requests')
-        .update({ photo_url: myPhotoUrl })
-        .eq('match_id', currentMatch.id)
-        .eq('to_user', currentProfile.id);
-    }
-
-    // Controlla se anche l'altro ha già inviato la sua foto
-    const { data: photoReq } = await sb.from('photo_requests')
+    // Carica il photo_request dal DB per sapere chi è from_user e to_user
+    const { data: photoReq, error: prErr } = await sb.from('photo_requests')
       .select('*')
       .eq('match_id', currentMatch.id)
       .maybeSingle();
 
-    const bothSent = photoReq &&
-      photoReq.photo_url &&
-      photoReq.requester_photo_url;
+    console.log('[Photo] photo_request:', photoReq, 'error:', prErr);
+
+    if (!photoReq) {
+      // Non esiste ancora il photo_request - crealo
+      const otherId = matchedProfile?.id;
+      await sb.from('photo_requests').insert({
+        match_id: currentMatch.id,
+        from_user: currentProfile.id,
+        to_user: otherId,
+        requester_photo_url: myPhotoUrl
+      });
+      // Vai in attesa
+      goToWaitingPhoto();
+      return;
+    }
+
+    // Aggiorna il campo giusto in base al ruolo
+    const iAmRequester = photoReq.from_user === currentProfile.id;
+    console.log('[Photo] iAmRequester:', iAmRequester);
+
+    if (iAmRequester) {
+      await sb.from('photo_requests')
+        .update({ requester_photo_url: myPhotoUrl })
+        .eq('id', photoReq.id);
+    } else {
+      await sb.from('photo_requests')
+        .update({ photo_url: myPhotoUrl })
+        .eq('id', photoReq.id);
+    }
+
+    // Ricarica il photo_request aggiornato
+    const { data: updated } = await sb.from('photo_requests')
+      .select('*')
+      .eq('id', photoReq.id)
+      .single();
+
+    console.log('[Photo] Updated req:', updated);
+
+    const bothSent = updated && updated.photo_url && updated.requester_photo_url;
+    console.log('[Photo] Both sent:', bothSent);
 
     if (bothSent) {
-      // Entrambi hanno inviato → aggiorna status e vai in chat
+      // Entrambi hanno inviato → chat!
       await sb.from('photo_requests')
         .update({ status: 'fulfilled' })
-        .eq('match_id', currentMatch.id);
+        .eq('id', updated.id);
 
       await sb.from('match_requests')
         .update({ status: 'accepted' })
         .eq('id', currentMatch.id);
 
-      // Inserisci le due foto come messaggi in chat
+      // Inserisci le due foto come messaggi
       await sb.from('messages').insert([
         {
           chat_id: currentMatch.id,
-          sender_id: photoReq.from_user,
-          content: photoReq.requester_photo_url,
+          sender_id: updated.from_user,
+          content: updated.requester_photo_url,
           type: 'photo'
         },
         {
           chat_id: currentMatch.id,
-          sender_id: photoReq.to_user,
-          content: photoReq.photo_url,
+          sender_id: updated.to_user,
+          content: updated.photo_url,
           type: 'photo'
         }
       ]);
 
       showAcceptedScreen();
     } else {
-      // Aspetta che anche l'altro invii
-      goTo('waiting-response');
-      const titleEl = document.querySelector('#s-waiting-response .waiting-resp-title');
-      if (titleEl) titleEl.innerHTML = 'Foto inviata! ✓<br/>In attesa che <span id="waitingRespName">' + (matchedProfile?.name || '') + '</span> scatti la sua…';
-      if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
-      // Timer 60s per aspettare l'altro
-      let secs = 60;
-      waitingRespTimer = setInterval(async () => {
-        secs--;
-        const el = document.getElementById('waitingRespTimer');
-        if (el) el.textContent = secs;
-        if (secs <= 0) {
-          clearInterval(waitingRespTimer);
-          waitingRespTimer = null;
-          document.getElementById('popupExpired').classList.add('show');
-        }
-      }, 1000);
+      goToWaitingPhoto();
     }
 
   } catch(e) {
-    console.error('sendLivePhoto error:', e);
+    console.error('[Photo] sendLivePhoto error:', e);
     if (btn) { btn.disabled = false; btn.textContent = 'Invia foto →'; }
   }
+}
+
+function goToWaitingPhoto() {
+  goTo('waiting-response');
+  if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
+  const titleEl = document.querySelector('#s-waiting-response .waiting-resp-title');
+  if (titleEl) titleEl.innerHTML = 'Foto inviata! ✓<br/>Attendi che <span>' + (matchedProfile?.name || 'l\'altro') + '</span> scatti la sua…';
+  const timerEl = document.getElementById('waitingRespTimer');
+  if (timerEl) timerEl.textContent = '60';
+  let secs = 60;
+  waitingRespTimer = setInterval(async () => {
+    secs--;
+    if (timerEl) timerEl.textContent = secs;
+    if (secs <= 0) {
+      clearInterval(waitingRespTimer);
+      waitingRespTimer = null;
+      document.getElementById('popupExpired').classList.add('show');
+    }
+  }, 1000);
 }
 
 // ============================================================
