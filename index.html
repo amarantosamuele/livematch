@@ -1684,8 +1684,7 @@ function toastSendPhoto() {
   currentMatch = matchData;
   matchedProfile = profile;
   dismissToast();
-  document.getElementById('photoTitle').textContent = profile.name + ' ti ha chiesto una foto dal vivo!
-Scatta anche tu entro 60 secondi.';
+  document.getElementById('photoTitle').textContent = profile.name + ' ti ha chiesto una foto dal vivo! Scatta anche tu entro 60 secondi.';
   goTo('photo');
   startPhotoTimer();
 }
@@ -2727,6 +2726,7 @@ async function requestPhoto() {
   if (!matchedProfile || !currentProfile) return;
   stopMatchTimer();
 
+  // Controlla se esiste già un match_request nei due sensi
   if (!currentMatch) {
     const { data: existing } = await sb.from('match_requests')
       .select('*')
@@ -2745,8 +2745,21 @@ async function requestPhoto() {
         to_user: matchedProfile.id,
         status: 'photo_requested'
       }).select().single();
-      if (error) { console.error('match insert error:', error); return; }
-      currentMatch = match;
+
+      if (error) {
+        // Race condition: ricarica
+        const { data: retry } = await sb.from('match_requests')
+          .select('*')
+          .or(
+            'and(from_user.eq.' + currentProfile.id + ',to_user.eq.' + matchedProfile.id + '),' +
+            'and(from_user.eq.' + matchedProfile.id + ',to_user.eq.' + currentProfile.id + ')'
+          )
+          .maybeSingle();
+        if (retry) currentMatch = retry;
+        else return;
+      } else {
+        currentMatch = match;
+      }
     }
   } else {
     await sb.from('match_requests')
@@ -2754,17 +2767,562 @@ async function requestPhoto() {
       .eq('id', currentMatch.id);
   }
 
-  // Crea photo request → B riceve notifica toast
+  // Crea photo request → B riceve toast via postgres_changes
   await sb.from('photo_requests').insert({
     match_id: currentMatch.id,
     from_user: currentProfile.id,
     to_user: matchedProfile.id
-  }).catch(() => {});
+  });
 
-  // A va subito alla schermata foto
-  document.getElementById('photoTitle').textContent = 'Scatta una foto per ' + matchedProfile.name;
+  document.getElementById('photoTitle').textContent = 'Stai chiedendo una foto a ' + matchedProfile.name;
   goTo('photo');
   startPhotoTimer();
 }
 
+function startPhotoTimer() {
+  stopPhotoTimer();
+  photoCapturedFile = null;
+  photoSecs = 60;
+  document.getElementById('cameraFrame').classList.remove('captured');
+  document.getElementById('camDefault').style.display = 'flex';
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('btnSendPhoto').style.display = 'none';
+  document.getElementById('photoFill').style.width = '100%';
+  document.getElementById('photoTimerTxt').textContent = '60s';
 
+  photoTimer = setInterval(() => {
+    photoSecs--;
+    const pct = photoSecs / 60 * 100;
+    document.getElementById('photoFill').style.width = pct + '%';
+    document.getElementById('photoTimerTxt').textContent = photoSecs + 's';
+    if (photoSecs <= 10) document.getElementById('photoFill').style.background = '#ff4d6d';
+    if (photoSecs <= 0) {
+      stopPhotoTimer();
+      if (!photoCapturedFile) {
+        document.getElementById('popupPhotoExp').classList.add('show');
+      }
+    }
+  }, 1000);
+}
+
+function stopPhotoTimer() {
+  if (photoTimer) { clearInterval(photoTimer); photoTimer = null; }
+}
+
+function handlePhotoCapture(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  photoCapturedFile = file;
+
+  // Usa FileReader per compatibilità iOS invece di createObjectURL
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById('camDefault').style.display = 'none';
+    const preview = document.getElementById('photoPreview');
+    preview.src = ev.target.result;
+    preview.style.display = 'block';
+    document.getElementById('cameraFrame').classList.add('captured');
+    const btn = document.getElementById('btnSendPhoto');
+    if (btn) { btn.style.display = 'block'; btn.disabled = false; btn.textContent = 'Invia foto e vai alla chat →'; }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function sendLivePhoto() {
+  stopPhotoTimer();
+
+  if (!photoCapturedFile || !currentMatch || !currentProfile) {
+    goTo('waiting');
+    return;
+  }
+
+  const btn = document.getElementById('btnSendPhoto');
+  if (btn) { btn.disabled = true; btn.textContent = 'Invio in corso…'; }
+
+  try {
+    // Converti in ArrayBuffer per iOS
+    const arrayBuffer = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(photoCapturedFile);
+    });
+
+    const mimeType = photoCapturedFile.type || 'image/jpeg';
+    const ext = mimeType.includes('png') ? 'png' : 'jpg';
+    const path = currentMatch.id + '/' + currentProfile.id + '-' + Date.now() + '.' + ext;
+
+    const { error: uploadError } = await sb.storage
+      .from('live-photos')
+      .upload(path, arrayBuffer, { contentType: mimeType, upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
+    const myPhotoUrl = urlData.publicUrl;
+
+    // Salva la mia foto nel photo_request
+    // from_user = chi ha chiesto (A), to_user = chi risponde (B)
+    const iAmRequester = currentMatch.from_user === currentProfile.id;
+
+    if (iAmRequester) {
+      // A ha scattato la sua foto → aggiorna requester_photo_url
+      await sb.from('photo_requests')
+        .update({ requester_photo_url: myPhotoUrl })
+        .eq('match_id', currentMatch.id)
+        .eq('from_user', currentProfile.id);
+    } else {
+      // B ha scattato la sua foto → aggiorna photo_url
+      await sb.from('photo_requests')
+        .update({ photo_url: myPhotoUrl })
+        .eq('match_id', currentMatch.id)
+        .eq('to_user', currentProfile.id);
+    }
+
+    // Controlla se anche l'altro ha già inviato la sua foto
+    const { data: photoReq } = await sb.from('photo_requests')
+      .select('*')
+      .eq('match_id', currentMatch.id)
+      .maybeSingle();
+
+    const bothSent = photoReq &&
+      photoReq.photo_url &&
+      photoReq.requester_photo_url;
+
+    if (bothSent) {
+      // Entrambi hanno inviato → aggiorna status e vai in chat
+      await sb.from('photo_requests')
+        .update({ status: 'fulfilled' })
+        .eq('match_id', currentMatch.id);
+
+      await sb.from('match_requests')
+        .update({ status: 'accepted' })
+        .eq('id', currentMatch.id);
+
+      // Inserisci le due foto come messaggi in chat
+      await sb.from('messages').insert([
+        {
+          chat_id: currentMatch.id,
+          sender_id: photoReq.from_user,
+          content: photoReq.requester_photo_url,
+          type: 'photo'
+        },
+        {
+          chat_id: currentMatch.id,
+          sender_id: photoReq.to_user,
+          content: photoReq.photo_url,
+          type: 'photo'
+        }
+      ]);
+
+      showAcceptedScreen();
+    } else {
+      // Aspetta che anche l'altro invii
+      goTo('waiting-response');
+      const titleEl = document.querySelector('#s-waiting-response .waiting-resp-title');
+      if (titleEl) titleEl.innerHTML = 'Foto inviata! ✓<br/>In attesa che <span id="waitingRespName">' + (matchedProfile?.name || '') + '</span> scatti la sua…';
+      if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
+      // Timer 60s per aspettare l'altro
+      let secs = 60;
+      waitingRespTimer = setInterval(async () => {
+        secs--;
+        const el = document.getElementById('waitingRespTimer');
+        if (el) el.textContent = secs;
+        if (secs <= 0) {
+          clearInterval(waitingRespTimer);
+          waitingRespTimer = null;
+          document.getElementById('popupExpired').classList.add('show');
+        }
+      }, 1000);
+    }
+
+  } catch(e) {
+    console.error('sendLivePhoto error:', e);
+    if (btn) { btn.disabled = false; btn.textContent = 'Invia foto →'; }
+  }
+}
+
+// ============================================================
+// CHAT
+// ============================================================
+function loadChatScreen() {
+  if (!matchedProfile) return;
+  const av = document.getElementById('chatAv');
+  if (matchedProfile.avatar_url) {
+    av.innerHTML = `<img src="${matchedProfile.avatar_url}" alt="${matchedProfile.name}" style="width:100%;height:100%;object-fit:cover;"/>`;
+  } else {
+    av.textContent = matchedProfile.name[0].toUpperCase();
+  }
+  document.getElementById('chatName').textContent = matchedProfile.name + ', ' + matchedProfile.age;
+  document.getElementById('chatSysMsg').textContent = 'Match live con ' + matchedProfile.name + '!';
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  const sys = document.createElement('div');
+  sys.className = 'sys-msg';
+  sys.textContent = 'Oggi · Match live con ' + matchedProfile.name + '!';
+  msgs.appendChild(sys);
+}
+
+async function subscribeToMessages() {
+  if (msgChannel) { sb.removeChannel(msgChannel); msgChannel = null; }
+  if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
+  if (!currentMatch || !currentProfile) return;
+
+  const chatId = currentMatch.id;
+  let knownMsgIds = new Set();
+
+  // Carica tutti i messaggi esistenti
+  async function loadAllMessages() {
+    const { data, error } = await sb.from('messages')
+      .select('*')
+      .eq('chat_id', chatId)
+      .order('created_at', { ascending: true });
+
+    if (error) { console.error('load messages error:', error); return; }
+
+    const msgsArea = document.getElementById('messages');
+    if (!msgsArea) return;
+
+    msgsArea.innerHTML = '';
+    const sys = document.createElement('div');
+    sys.className = 'sys-msg';
+    sys.textContent = 'Match live con ' + (matchedProfile ? matchedProfile.name : '') + '!';
+    msgsArea.appendChild(sys);
+
+    if (data && data.length > 0) {
+      for (const m of data) {
+        knownMsgIds.add(m.id);
+        if (m.sender_id !== currentProfile.id) {
+          const { data: sender } = await sb.from('profiles')
+            .select('name,avatar_url').eq('id', m.sender_id).single();
+          m.sender = sender;
+        } else {
+          m.sender = currentProfile;
+        }
+        renderMessage(m);
+      }
+    }
+  }
+
+  // Polling: controlla nuovi messaggi ogni 1s usando gli ID come riferimento
+  async function pollNewMessages() {
+    if (!currentMatch || currentMatch.id !== chatId) return;
+    const { data } = await sb.from('messages')
+      .select('*')
+      .eq('chat_id', chatId)
+      .order('created_at', { ascending: true });
+
+    if (data && data.length > 0) {
+      const newMsgs = data.filter(m => !knownMsgIds.has(m.id));
+      if (newMsgs.length > 0) {
+        hideTyping();
+        for (const m of newMsgs) {
+          knownMsgIds.add(m.id);
+          if (m.sender_id === currentProfile.id) continue;
+          const { data: sender } = await sb.from('profiles')
+            .select('name,avatar_url').eq('id', m.sender_id).single();
+          m.sender = sender;
+          renderMessage(m);
+        }
+      }
+    }
+  }
+
+  await loadAllMessages();
+
+  // Avvia polling ogni 2s
+  window._msgPoller = setInterval(pollNewMessages, 1000);
+  console.log('[LiveMatch] Chat polling started for', chatId);
+}
+
+
+function renderMessage(msg) {
+  const msgs = document.getElementById('messages');
+  const isMe = msg.sender_id === currentProfile.id;
+
+  if (msg.type === 'system') {
+    const sys = document.createElement('div');
+    sys.className = 'sys-msg';
+    sys.textContent = msg.content;
+    msgs.appendChild(sys);
+    msgs.scrollTop = msgs.scrollHeight;
+    return;
+  }
+
+  const row = document.createElement('div');
+  row.className = 'bubble-row' + (isMe ? ' me' : '');
+
+  if (!isMe) {
+    const av = document.createElement('div');
+    av.className = 'bubble-av-sm';
+    if (msg.sender?.avatar_url) {
+      av.innerHTML = `<img src="${msg.sender.avatar_url}" style="width:100%;height:100%;object-fit:cover;"/>`;
+    } else {
+      av.textContent = (msg.sender?.name || '?')[0].toUpperCase();
+    }
+    row.appendChild(av);
+  }
+
+  const bub = document.createElement('div');
+  bub.className = 'bubble ' + (isMe ? 'me' : 'them');
+  const t = new Date(msg.created_at);
+  const time = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
+
+  if (msg.type === 'photo') {
+    bub.innerHTML = `<img src="${msg.content}" style="max-width:180px;border-radius:10px;"/><div class="bubble-time">${time}</div>`;
+  } else {
+    bub.innerHTML = msg.content + `<div class="bubble-time">${time}</div>`;
+  }
+  row.appendChild(bub);
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || !currentMatch || !currentProfile) return;
+
+  const now = new Date().toISOString();
+  const localMsg = {
+    chat_id: currentMatch.id,
+    sender_id: currentProfile.id,
+    content: text,
+    type: 'text',
+    created_at: now,
+    sender: currentProfile
+  };
+
+  // Mostra subito localmente
+  renderMessage(localMsg);
+  input.value = '';
+
+  // Invia al DB
+  const { error } = await sb.from('messages').insert({
+    chat_id: currentMatch.id,
+    sender_id: currentProfile.id,
+    content: text,
+    type: 'text'
+  });
+
+  if (error) {
+    console.error('sendMessage error:', error);
+  }
+}
+
+async function sendPhotoMessage(e) {
+  const file = e.target.files[0];
+  if (!file || !currentMatch || !currentProfile) return;
+
+  try {
+    const arrayBuffer = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+
+    const mimeType = file.type || 'image/jpeg';
+    const ext = mimeType.includes('png') ? 'png' : 'jpg';
+    const path = currentMatch.id + '/chat-' + currentProfile.id + '-' + Date.now() + '.' + ext;
+
+    const { error } = await sb.storage.from('live-photos').upload(path, arrayBuffer, {
+      contentType: mimeType, upsert: true
+    });
+
+    if (!error) {
+      const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
+      const msg = {
+        chat_id: currentMatch.id,
+        sender_id: currentProfile.id,
+        content: urlData.publicUrl,
+        type: 'photo'
+      };
+      renderMessage({ ...msg, sender: currentProfile, created_at: new Date().toISOString() });
+      await sb.from('messages').insert(msg);
+    }
+  } catch(e) {
+    console.error('sendPhotoMessage error:', e);
+  }
+}
+
+let typingTimeout = null;
+function showTyping() {
+  const row = document.getElementById('typingRow');
+  if (row) row.classList.add('show');
+  const msgs = document.getElementById('messages');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  if (typingTimeout) clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(hideTyping, 3000);
+}
+function hideTyping() {
+  const row = document.getElementById('typingRow');
+  if (row) row.classList.remove('show');
+}
+
+// Typing indicator disabilitato (usava broadcast che causa warning)
+function handleChatInput() {
+  // noop - rimosso broadcast
+}
+
+async function subscribeToMatches() {
+  if (!currentProfile) return;
+
+  // Ascolta nuovi match_requests dove sei il destinatario (to_user)
+  // usando Supabase Realtime postgres_changes
+  if (realtimeChannel) sb.removeChannel(realtimeChannel);
+
+  console.log('[LiveMatch] Subscribed to matches for', currentProfile.id);
+  realtimeChannel = sb.channel('match-requests-incoming-' + currentProfile.id)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'match_requests',
+      filter: `to_user=eq.${currentProfile.id}`
+    }, async (payload) => {
+      const req = payload.new;
+      if (req.status !== 'pending') return;
+
+      // Carica il profilo di chi ci ha inviato il match
+      const { data: fromProfile } = await sb.from('profiles')
+        .select('*').eq('id', req.from_user).single();
+      if (!fromProfile) return;
+
+      currentMatch = req;
+      matchedProfile = fromProfile;
+      renderMatchScreen(fromProfile);
+
+      // Mostra toast non invasivo in alto
+      showToast({
+        profile: fromProfile,
+        type: 'match',
+        matchData: req
+      });
+    })
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'match_requests',
+      filter: `from_user=eq.${currentProfile.id}`
+    }, async (payload) => {
+      const req = payload.new;
+      // L'altro utente ha risposto al nostro match request
+      if (req.status === 'accepted') {
+        stopMatchTimer();
+        if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
+        const active = document.querySelector('.screen.active');
+        if (active && active.id !== 's-chat' && active.id !== 's-accepted') {
+          currentMatch = req;
+          if (!matchedProfile) {
+            const otherId = req.from_user === currentProfile.id ? req.to_user : req.from_user;
+            const { data: otherProfile } = await sb.from('profiles')
+              .select('*').eq('id', otherId).single();
+            if (otherProfile) { matchedProfile = otherProfile; renderMatchScreen(otherProfile); }
+          }
+          showAcceptedScreen();
+        }
+      } else if (req.status === 'rejected') {
+        if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
+        currentMatch = null;
+        matchedProfile = null;
+        document.getElementById('popupReject').classList.add('show');
+      }
+    })
+    .subscribe();
+
+  // Ascolta INSERT su photo_requests → B riceve richiesta foto da A
+  sb.channel('photo-requests-incoming-' + currentProfile.id)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'photo_requests',
+      filter: 'to_user=eq.' + currentProfile.id
+    }, async (payload) => {
+      const req = payload.new;
+      const { data: fromProfile } = await sb.from('profiles')
+        .select('*').eq('id', req.from_user).single();
+      if (!fromProfile) return;
+      const { data: matchData } = await sb.from('match_requests')
+        .select('*').eq('id', req.match_id).single();
+      if (!currentMatch && matchData) currentMatch = matchData;
+      if (!matchedProfile) matchedProfile = fromProfile;
+      // Mostra toast a B per scattare la foto
+      showToast({ profile: fromProfile, type: 'photo', matchData: matchData || currentMatch });
+    })
+    .subscribe();
+
+  // Ascolta UPDATE su photo_requests
+  // Quando entrambi inviano la foto → vai in chat
+  sb.channel('photo-fulfilled-' + currentProfile.id)
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'photo_requests'
+    }, async (payload) => {
+      const req = payload.new;
+      if (!req) return;
+
+      // Controlla se riguarda me
+      const isMyReq = req.from_user === currentProfile.id || req.to_user === currentProfile.id;
+      if (!isMyReq) return;
+
+      // Se entrambi hanno inviato la foto (status fulfilled)
+      if (req.status === 'fulfilled' && req.photo_url && req.requester_photo_url) {
+        // Verifica che il match sia accepted
+        const { data: matchData } = await sb.from('match_requests')
+          .select('*').eq('id', req.match_id).single();
+        if (matchData) currentMatch = matchData;
+
+        // Carica profilo dell'altro
+        if (!matchedProfile) {
+          const otherId = req.from_user === currentProfile.id ? req.to_user : req.from_user;
+          const { data: other } = await sb.from('profiles').select('*').eq('id', otherId).single();
+          if (other) matchedProfile = other;
+        }
+
+        const active = document.querySelector('.screen.active');
+        if (active && active.id !== 's-chat' && active.id !== 's-accepted') {
+          if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
+          showAcceptedScreen();
+        }
+      }
+      // Se l'altro ha appena inviato la sua foto ma io non ho ancora inviato
+      else if (req.status !== 'fulfilled') {
+        const iAmRequester = req.from_user === currentProfile.id;
+        const otherSent = iAmRequester ? req.photo_url : req.requester_photo_url;
+        const iSent = iAmRequester ? req.requester_photo_url : req.photo_url;
+
+        if (otherSent && !iSent) {
+          // L'altro ha inviato, io non ancora - mostra notifica
+          const active = document.querySelector('.screen.active');
+          if (active && active.id === 's-waiting-response') {
+            // Aggiorna messaggio di attesa
+            const titleEl = document.querySelector('#s-waiting-response .waiting-resp-title');
+            if (titleEl) titleEl.innerHTML = "L'altro ha inviato!<br/>Ora tocca a te scattare 📸";
+            // Torna alla schermata foto
+            setTimeout(() => {
+              goTo('photo');
+              startPhotoTimer();
+            }, 1500);
+          }
+        }
+      }
+    })
+    .subscribe();
+}
+
+function leaveChat() {
+  if (msgChannel) { sb.removeChannel(msgChannel); msgChannel = null; }
+  if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
+  navTo('waiting');
+}
+
+// ============================================================
+// START
+// ============================================================
+init().then(() => {
+  if (currentProfile) subscribeToMatches();
+});
+</script>
+</body>
+</html>
