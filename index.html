@@ -1124,6 +1124,28 @@ body::before {
     </div>
   </div>
 
+
+  <!-- ===== PHOTO REVIEW (A vede la foto di B) ===== -->
+  <div class="screen" id="s-photo-review">
+    <div class="topbar" style="border-bottom:0.5px solid var(--border);padding-top:max(12px,env(safe-area-inset-top));">
+      <div style="width:24px"></div>
+      <div style="font-size:14px;font-weight:500;">Foto dal vivo</div>
+      <div style="width:24px"></div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;">
+      <div style="font-family:'DM Serif Display',serif;font-size:20px;text-align:center;" id="photoReviewTitle">Ha inviato la sua foto!</div>
+      <div style="font-size:13px;color:var(--text2);text-align:center;">Vuoi accettare il match?</div>
+      <div style="width:260px;height:260px;border-radius:var(--r2);overflow:hidden;border:0.5px solid var(--border2);">
+        <img id="photoReviewImg" src="" style="width:100%;height:100%;object-fit:cover;"/>
+      </div>
+      <div style="display:flex;gap:10px;width:100%;">
+        <button class="btn-reject" style="flex:1" onclick="rejectAfterPhoto()">✕ Rifiuta</button>
+        <button class="btn-accept" style="flex:1" onclick="acceptAfterPhoto()">✓ Accetta</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);text-align:center;">La tua decisione è definitiva</div>
+    </div>
+  </div>
+
   <!-- ===== MATCH ACCEPTED ===== -->
   <div class="screen" id="s-accepted">
     <div class="topbar">
@@ -1666,6 +1688,9 @@ function toastSendPhoto() {
   goTo('photo');
   startPhotoTimer();
 }
+
+// Quando B accetta dal toast della foto (va direttamente a scattare)
+
 
 
 // ============================================================
@@ -2410,6 +2435,40 @@ function cancelSearch() {
 }
 
 
+
+// ============================================================
+// PHOTO REVIEW - A vede la foto di B e decide
+// ============================================================
+function showPhotoReview(photoUrl, profile) {
+  dismissToast();
+  const img = document.getElementById('photoReviewImg');
+  if (img) img.src = photoUrl;
+  const title = document.getElementById('photoReviewTitle');
+  if (title && profile) title.textContent = profile.name + ' ha inviato la sua foto!';
+  playMatchSound();
+  vibrate([100, 50, 100]);
+  goTo('photo-review');
+}
+
+async function acceptAfterPhoto() {
+  if (!currentMatch) return;
+  // Aggiorna match a accepted
+  await sb.from('match_requests')
+    .update({ status: 'accepted' })
+    .eq('id', currentMatch.id);
+  showAcceptedScreen();
+}
+
+async function rejectAfterPhoto() {
+  if (!currentMatch) return;
+  await sb.from('match_requests')
+    .update({ status: 'rejected' })
+    .eq('id', currentMatch.id);
+  currentMatch = null;
+  matchedProfile = null;
+  document.getElementById('popupReject').classList.add('show');
+}
+
 // ============================================================
 // WAITING FOR RESPONSE (utente1 aspetta che utente2 accetti)
 // ============================================================
@@ -2805,21 +2864,36 @@ async function sendLivePhoto() {
         upsert: true
       });
 
-    // Vai in chat indipendentemente dall'esito upload
-    loadChatScreen();
-    goTo('chat');
-    await subscribeToMessages();
+    // Non andare in chat subito - aspetta che A decida dopo aver visto la foto
+    // La navigazione avviene in base alla risposta di A
 
     if (!uploadError) {
       const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
-      await sb.from('messages').insert({
-        chat_id: currentMatch.id,
-        sender_id: currentProfile.id,
-        content: urlData.publicUrl,
-        type: 'photo'
-      });
+      const photoUrl = urlData.publicUrl;
+
+      // Aggiorna photo_request con la foto e status 'fulfilled'
+      // Questo triggera la notifica ad A via postgres_changes
+      await sb.from('photo_requests')
+        .update({
+          status: 'fulfilled',
+          photo_url: photoUrl
+        })
+        .eq('match_id', currentMatch.id)
+        .eq('to_user', currentProfile.id);
+
+      // Mostra schermata attesa per B
+      goTo('waiting-response');
+      renderWaitingResponse(matchedProfile);
+      document.getElementById('waitingRespName').textContent && (
+        document.querySelector('#s-waiting-response .waiting-resp-title').innerHTML =
+          'Foto inviata!<br/>In attesa della risposta di <span>' + (matchedProfile?.name || '') + '</span>'
+      );
     } else {
       console.error('Photo upload error:', uploadError);
+      // Vai in chat comunque
+      loadChatScreen();
+      goTo('chat');
+      await subscribeToMessages();
     }
 
   } catch(e) {
@@ -3097,13 +3171,11 @@ async function subscribeToMatches() {
       const req = payload.new;
       // L'altro utente ha risposto al nostro match request
       if (req.status === 'accepted') {
-        // A riceve notifica che B ha accettato
         stopMatchTimer();
         if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
         const active = document.querySelector('.screen.active');
         if (active && active.id !== 's-chat' && active.id !== 's-accepted') {
           currentMatch = req;
-          // Carica profilo di B se non presente
           if (!matchedProfile) {
             const otherId = req.from_user === currentProfile.id ? req.to_user : req.from_user;
             const { data: otherProfile } = await sb.from('profiles')
@@ -3121,7 +3193,7 @@ async function subscribeToMatches() {
     })
     .subscribe();
 
-  // Ascolta richieste foto dal vivo tramite postgres_changes (più affidabile)
+  // Ascolta INSERT su photo_requests → B riceve richiesta foto da A
   sb.channel('photo-requests-incoming-' + currentProfile.id)
     .on('postgres_changes', {
       event: 'INSERT',
@@ -3130,23 +3202,36 @@ async function subscribeToMatches() {
       filter: 'to_user=eq.' + currentProfile.id
     }, async (payload) => {
       const req = payload.new;
-      // Carica profilo di chi ha chiesto la foto
       const { data: fromProfile } = await sb.from('profiles')
         .select('*').eq('id', req.from_user).single();
       if (!fromProfile) return;
-
-      // Carica match associato
       const { data: matchData } = await sb.from('match_requests')
         .select('*').eq('id', req.match_id).single();
-
       if (!currentMatch && matchData) currentMatch = matchData;
       if (!matchedProfile) matchedProfile = fromProfile;
+      // Mostra toast a B per scattare la foto
+      showToast({ profile: fromProfile, type: 'photo', matchData: matchData || currentMatch });
+    })
+    .subscribe();
 
-      showToast({
-        profile: fromProfile,
-        type: 'photo',
-        matchData: matchData || currentMatch
-      });
+  // Ascolta UPDATE su photo_requests → A riceve la foto inviata da B
+  sb.channel('photo-fulfilled-' + currentProfile.id)
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'photo_requests',
+      filter: 'from_user=eq.' + currentProfile.id
+    }, async (payload) => {
+      const req = payload.new;
+      if (req.status !== 'fulfilled' || !req.photo_url) return;
+
+      // A vede la foto di B
+      const { data: fromProfile } = await sb.from('profiles')
+        .select('*').eq('id', req.to_user).single();
+      if (fromProfile && !matchedProfile) matchedProfile = fromProfile;
+
+      // Mostra schermata revisione foto
+      showPhotoReview(req.photo_url, fromProfile || matchedProfile);
     })
     .subscribe();
 }
