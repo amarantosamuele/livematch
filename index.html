@@ -1125,24 +1125,24 @@ body::before {
   </div>
 
 
-  <!-- ===== PHOTO REVIEW (A vede la foto di B) ===== -->
+  <!-- ===== PHOTO REVIEW ===== -->
   <div class="screen" id="s-photo-review">
     <div class="topbar" style="border-bottom:0.5px solid var(--border);padding-top:max(12px,env(safe-area-inset-top));">
       <div style="width:24px"></div>
       <div style="font-size:14px;font-weight:500;">Foto dal vivo</div>
-      <div style="width:24px"></div>
+      <div style="font-size:13px;color:var(--accent);font-weight:600;" id="photoReviewTimer">60s</div>
     </div>
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;">
-      <div style="font-family:'DM Serif Display',serif;font-size:20px;text-align:center;" id="photoReviewTitle">Ha inviato la sua foto!</div>
-      <div style="font-size:13px;color:var(--text2);text-align:center;">Vuoi accettare il match?</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:20px;text-align:center;" id="photoReviewTitle">Foto dal vivo</div>
+      <div style="font-size:13px;color:var(--text2);text-align:center;">Vuoi fare match con questa persona?</div>
       <div style="width:260px;height:260px;border-radius:var(--r2);overflow:hidden;border:0.5px solid var(--border2);">
         <img id="photoReviewImg" src="" style="width:100%;height:100%;object-fit:cover;"/>
       </div>
       <div style="display:flex;gap:10px;width:100%;">
-        <button class="btn-reject" style="flex:1" onclick="rejectAfterPhoto()">✕ Rifiuta</button>
-        <button class="btn-accept" style="flex:1" onclick="acceptAfterPhoto()">✓ Accetta</button>
+        <button class="btn-reject" style="flex:1" onclick="rejectPhotoReview()">✕ Rifiuta</button>
+        <button class="btn-accept" style="flex:1" onclick="acceptPhotoReview()">✓ Accetta</button>
       </div>
-      <div style="font-size:11px;color:var(--text3);text-align:center;">La tua decisione è definitiva</div>
+      <div style="font-size:11px;color:var(--text3);text-align:center;">Hai 60 secondi per decidere</div>
     </div>
   </div>
 
@@ -2930,27 +2930,102 @@ function goToWaitingPhoto() {
 }
 
 async function openChatWithPhotos(photoReq) {
+  // Aggiorna status a 'fulfilled' - entrambi hanno inviato
   await sb.from('photo_requests').update({ status: 'fulfilled' }).eq('id', photoReq.id);
-  await sb.from('match_requests').update({ status: 'accepted' }).eq('id', currentMatch.id);
-
-  // Inserisci le due foto come messaggi
-  await sb.from('messages').insert([
-    {
-      chat_id: currentMatch.id,
-      sender_id: photoReq.from_user,
-      content: photoReq.requester_photo_url,
-      type: 'photo'
-    },
-    {
-      chat_id: currentMatch.id,
-      sender_id: photoReq.to_user,
-      content: photoReq.photo_url,
-      type: 'photo'
-    }
-  ]);
 
   if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
-  showAcceptedScreen();
+
+  // Mostra la foto dell'ALTRO utente per decidere
+  const iAmRequester = photoReq.from_user === currentProfile.id;
+  const otherPhotoUrl = iAmRequester ? photoReq.photo_url : photoReq.requester_photo_url;
+
+  showPhotoReviewScreen(otherPhotoUrl, photoReq);
+}
+
+function showPhotoReviewScreen(photoUrl, photoReq) {
+  // Mostra schermata con foto dell'altro e timer 60s
+  const img = document.getElementById('photoReviewImg');
+  if (img) img.src = photoUrl;
+
+  const title = document.getElementById('photoReviewTitle');
+  if (title && matchedProfile) title.textContent = 'Foto di ' + matchedProfile.name;
+
+  goTo('photo-review');
+
+  // Timer 60s per decidere
+  let secs = 60;
+  const timerEl = document.getElementById('photoReviewTimer');
+  if (timerEl) timerEl.textContent = secs + 's';
+
+  if (window._photoReviewTimer) clearInterval(window._photoReviewTimer);
+  window._photoReviewTimer = setInterval(async () => {
+    secs--;
+    if (timerEl) timerEl.textContent = secs + 's';
+    if (secs <= 0) {
+      clearInterval(window._photoReviewTimer);
+      window._photoReviewTimer = null;
+      // Tempo scaduto - annulla match
+      await rejectPhotoReview();
+    }
+  }, 1000);
+}
+
+async function acceptPhotoReview() {
+  if (window._photoReviewTimer) { clearInterval(window._photoReviewTimer); window._photoReviewTimer = null; }
+  if (!currentMatch || !currentProfile) return;
+
+  const iAmRequester = await getIsRequester();
+
+  // Salva la mia accettazione
+  const updateField = iAmRequester ? { accepted_by_requester: true } : { accepted_by_receiver: true };
+  await sb.from('photo_requests').update(updateField).eq('match_id', currentMatch.id);
+
+  // Controlla se anche l'altro ha accettato
+  const { data: req } = await sb.from('photo_requests')
+    .select('*').eq('match_id', currentMatch.id).single();
+
+  if (req && req.accepted_by_requester && req.accepted_by_receiver) {
+    // Entrambi hanno accettato → chat!
+    await sb.from('match_requests').update({ status: 'accepted' }).eq('id', currentMatch.id);
+    showAcceptedScreen();
+  } else {
+    // Aspetto che anche l'altro accetti
+    goTo('waiting-response');
+    const titleEl = document.querySelector('#s-waiting-response .waiting-resp-title');
+    const name = matchedProfile?.name || '';
+    if (titleEl) titleEl.innerHTML = 'Hai accettato! ✓<br/>In attesa che <span>' + name + '</span> accetti…';
+    const timerEl = document.getElementById('waitingRespTimer');
+    if (timerEl) timerEl.textContent = '60';
+    let wsecs = 60;
+    if (waitingRespTimer) clearInterval(waitingRespTimer);
+    waitingRespTimer = setInterval(async () => {
+      wsecs--;
+      if (timerEl) timerEl.textContent = wsecs;
+      if (wsecs <= 0) {
+        clearInterval(waitingRespTimer);
+        waitingRespTimer = null;
+        await rejectPhotoReview();
+      }
+    }, 1000);
+  }
+}
+
+async function rejectPhotoReview() {
+  if (window._photoReviewTimer) { clearInterval(window._photoReviewTimer); window._photoReviewTimer = null; }
+  if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
+  if (currentMatch) {
+    await sb.from('match_requests').update({ status: 'rejected' }).eq('id', currentMatch.id);
+  }
+  currentMatch = null;
+  matchedProfile = null;
+  document.getElementById('popupReject').classList.add('show');
+}
+
+async function getIsRequester() {
+  if (!currentMatch || !currentProfile) return false;
+  const { data: req } = await sb.from('photo_requests')
+    .select('from_user').eq('match_id', currentMatch.id).single();
+  return req?.from_user === currentProfile.id;
 }
 
 
@@ -3280,23 +3355,37 @@ async function subscribeToMatches() {
 
       console.log('[Photo] photo_requests UPDATE received:', req.status, 'photo_url:', !!req.photo_url, 'requester_photo_url:', !!req.requester_photo_url);
 
-      // Caso 1: entrambi hanno inviato → apri chat
-      if (req.photo_url && req.requester_photo_url) {
-        // Carica match se non presente
+      // Caso 1: entrambi hanno inviato → mostra foto dell'altro per decidere
+      if (req.photo_url && req.requester_photo_url && req.status !== 'fulfilled') {
         if (!currentMatch || currentMatch.id !== req.match_id) {
           const { data: matchData } = await sb.from('match_requests')
             .select('*').eq('id', req.match_id).single();
           if (matchData) currentMatch = matchData;
         }
-        // Carica profilo dell'altro se non presente
         if (!matchedProfile) {
           const otherId = req.from_user === currentProfile.id ? req.to_user : req.from_user;
           const { data: other } = await sb.from('profiles').select('*').eq('id', otherId).single();
           if (other) matchedProfile = other;
         }
         const active = document.querySelector('.screen.active');
-        if (active && active.id !== 's-chat' && active.id !== 's-accepted') {
+        if (active && active.id !== 's-chat' && active.id !== 's-accepted' && active.id !== 's-photo-review') {
           await openChatWithPhotos(req);
+        }
+        return;
+      }
+
+      // Caso 1b: entrambi hanno accettato → apri chat
+      if (req.status === 'fulfilled' && req.accepted_by_requester && req.accepted_by_receiver) {
+        if (!currentMatch || currentMatch.id !== req.match_id) {
+          const { data: matchData } = await sb.from('match_requests')
+            .select('*').eq('id', req.match_id).single();
+          if (matchData && matchData.status === 'accepted') {
+            const active = document.querySelector('.screen.active');
+            if (active && active.id !== 's-chat' && active.id !== 's-accepted') {
+              if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
+              showAcceptedScreen();
+            }
+          }
         }
         return;
       }
