@@ -2014,6 +2014,10 @@ async function loadChatList() {
       </div>
       <div class="chat-list-time">${escapeHtml(timeStr)}</div>
     `;
+    // ✅ FIX iOS: onclick diretto con closure (oltre alla delegation). Su Safari
+    // iOS è il modo più affidabile per registrare il tap; il guard in
+    // openChatFromList evita doppie aperture se scattano sia onclick che delegation.
+    item.onclick = () => openChatFromList(match, other);
     list.appendChild(item);
   }
 }
@@ -2028,18 +2032,27 @@ function formatTime(date) {
 }
 
 async function openChatFromList(match, other) {
+  // ✅ FIX iOS: guardia anti doppio-tap (onclick + delegation possono sparare entrambi)
+  if (_enteringChat) return;
+  _enteringChat = true;
   // Ferma tutto ciò che è in corso
   if (msgChannel) { sb.removeChannel(msgChannel); msgChannel = null; }
   if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
   if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
 
-  // ✅ FIX: navigazione immediata per feedback istantaneo
+  // ✅ FIX: navigazione immediata, PRIMA di ogni await → entra sempre nella chat
   matchedProfile = other;
   currentMatch = match;
-  loadChatScreen();
+  try { loadChatScreen(); } catch(e) { console.error('[LiveMatch] loadChatScreen error:', e); }
   goTo('chat');
-  await subscribeToMessages();
-  console.log('[LiveMatch] Opened chat from list, matchId:', match.id, 'with:', other.name);
+  try {
+    await subscribeToMessages();
+    console.log('[LiveMatch] Opened chat from list, matchId:', match.id, 'with:', other.name);
+  } catch(e) {
+    console.error('[LiveMatch] openChatFromList error:', e);
+  } finally {
+    _enteringChat = false;
+  }
 }
 
 // ============================================================
@@ -2822,20 +2835,27 @@ async function acceptMatch() {
   }
 }
 
+let _enteringChat = false;
 async function enterChat() {
+  // ✅ FIX iOS: guardia anti doppio-tap (touchend + click sparano entrambi su iOS)
+  if (_enteringChat) return;
+  _enteringChat = true;
   console.log('[LiveMatch] enterChat called, matchedProfile:', matchedProfile?.name, 'currentProfile:', currentProfile?.name);
 
-  // Previeni doppi tap
   const btn = document.getElementById('btnGoChat');
   if (btn) { btn.disabled = true; btn.textContent = 'Caricamento…'; }
 
-  // ✅ FIX: naviga SUBITO alla chat senza aspettare le query DB
-  loadChatScreen();
+  // ✅ FIX: naviga SUBITO alla chat, PRIMA di qualunque await/errore di rete.
+  // Così l'utente entra sempre nella chat anche se le query DB falliscono.
+  try { loadChatScreen(); } catch(e) { console.error('[LiveMatch] loadChatScreen error:', e); }
   goTo('chat');
-  await subscribeToMessages();
 
-  // In background: cerca il match con messaggi (se ci sono più match tra gli stessi utenti)
+  // ✅ FIX: try/finally → il bottone si riabilita SEMPRE (prima il reset era
+  // fuori dal try: se subscribeToMessages lanciava, restava "Caricamento…").
   try {
+    await subscribeToMessages();
+
+    // In background: cerca il match con messaggi (se ci sono più match tra gli stessi utenti)
     if (matchedProfile && currentProfile) {
       const { data: allMatches } = await sb.from('match_requests')
         .select('*')
@@ -2864,10 +2884,11 @@ async function enterChat() {
       }
     }
   } catch(e) {
-    console.error('[LiveMatch] enterChat background error:', e);
+    console.error('[LiveMatch] enterChat error:', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '💬 Inizia a chattare'; }
+    _enteringChat = false;
   }
-
-  if (btn) { btn.disabled = false; btn.textContent = '💬 Inizia a chattare'; }
 }
 
 function showAcceptedScreen() {
@@ -3350,7 +3371,26 @@ async function subscribeToMessages() {
 
   await loadAllMessages();
 
-  // ✅ REALTIME: ascolta nuovi messaggi via WebSocket (zero polling)
+  // Recupera e mostra i messaggi non ancora visti (dedup via knownMsgIds).
+  async function pollNewMessages() {
+    if (!currentMatch || currentMatch.id !== chatId) {
+      if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
+      return;
+    }
+    const { data } = await sb.from('messages')
+      .select('*').eq('chat_id', chatId).order('created_at', { ascending: true });
+    if (!data) return;
+    for (const m of data) {
+      if (knownMsgIds.has(m.id)) continue;
+      knownMsgIds.add(m.id);
+      if (m.sender_id === currentProfile.id) continue; // i miei sono già mostrati
+      hideTyping();
+      m.sender = await getSender(m.sender_id);
+      renderMessage(m);
+    }
+  }
+
+  // ✅ REALTIME: ascolta nuovi messaggi via WebSocket (consegna istantanea)
   msgChannel = sb.channel('messages-' + chatId)
     .on('postgres_changes', {
       event: 'INSERT',
@@ -3370,28 +3410,17 @@ async function subscribeToMessages() {
     })
     .subscribe((status) => {
       console.log('[LiveMatch] Messages Realtime status:', status, 'chatId:', chatId);
-      // Fallback polling solo se il WebSocket non si connette
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        console.warn('[LiveMatch] Realtime failed, fallback a polling 3s');
-        if (!window._msgPoller) {
-          window._msgPoller = setInterval(async () => {
-            if (!currentMatch || currentMatch.id !== chatId) { clearInterval(window._msgPoller); return; }
-            const { data } = await sb.from('messages').select('*').eq('chat_id', chatId).order('created_at', { ascending: true });
-            if (data) {
-              const newMsgs = data.filter(m => !knownMsgIds.has(m.id));
-              for (const m of newMsgs) {
-                knownMsgIds.add(m.id);
-                if (m.sender_id === currentProfile.id) continue;
-                m.sender = await getSender(m.sender_id);
-                renderMessage(m);
-              }
-            }
-          }, 3000);
-        }
-      }
     });
 
-  console.log('[LiveMatch] Messages Realtime subscribed for', chatId);
+  // ✅ FIX iOS: polling di sicurezza SEMPRE attivo a chat aperta (3s).
+  // Su Safari iOS il WebSocket Realtime spesso si "iscrive" ma non consegna
+  // mai gli eventi, e il vecchio fallback partiva solo su CHANNEL_ERROR →
+  // i messaggi non arrivavano mai. Il dedup evita doppioni quando il
+  // Realtime invece funziona. Gira solo finché la chat è aperta (~20 req/min).
+  if (window._msgPoller) { clearInterval(window._msgPoller); }
+  window._msgPoller = setInterval(pollNewMessages, 3000);
+
+  console.log('[LiveMatch] Messages subscribed (realtime + poll) for', chatId);
 }
 
 
