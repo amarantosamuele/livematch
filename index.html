@@ -1954,7 +1954,7 @@ async function loadChatList() {
     .select('*')
     .or('from_user.eq.' + currentProfile.id + ',to_user.eq.' + currentProfile.id)
     .eq('status', 'accepted')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: true }); // più vecchio prima → il 1° per persona è il canonico
 
   if (error || !matches || matches.length === 0) {
     list.innerHTML = `
@@ -1969,8 +1969,15 @@ async function loadChatList() {
 
   list.innerHTML = '';
 
+  // ✅ FIX: una sola riga per persona (la chat canonica = match accettato più
+  // vecchio). Senza questo, più match_requests con la stessa persona creavano
+  // righe duplicate ("si apre una nuova chat").
+  const seenOthers = new Set();
+
   for (const match of matches) {
     const otherId = match.from_user === currentProfile.id ? match.to_user : match.from_user;
+    if (seenOthers.has(otherId)) continue;
+    seenOthers.add(otherId);
 
     // Carica profilo dell'altro utente (view pubblica, senza dati sensibili)
     const { data: other } = await sb.from('profiles_public').select('*').eq('id', otherId).single();
@@ -2031,6 +2038,25 @@ function formatTime(date) {
   return date.getDate() + '/' + (date.getMonth()+1);
 }
 
+// ✅ FIX chat divergente: tra due utenti possono esistere PIÙ match_requests
+// (la chat usa match_request.id come chat_id). Se i due aprono record diversi,
+// i messaggi finiscono su chat_id diversi e non si vedono. Questa funzione
+// risolve in modo DETERMINISTICO la stessa conversazione per entrambi:
+// il match 'accepted' più VECCHIO della coppia (entrambi calcolano lo stesso).
+async function resolveCanonicalMatch(otherId) {
+  if (!currentProfile || !otherId) return null;
+  const { data } = await sb.from('match_requests')
+    .select('*')
+    .or(
+      'and(from_user.eq.' + currentProfile.id + ',to_user.eq.' + otherId + '),' +
+      'and(from_user.eq.' + otherId + ',to_user.eq.' + currentProfile.id + ')'
+    )
+    .order('created_at', { ascending: true });
+  if (!data || data.length === 0) return null;
+  const accepted = data.filter(m => m.status === 'accepted');
+  return accepted.length ? accepted[0] : data[0];
+}
+
 async function openChatFromList(match, other) {
   // ✅ FIX iOS: guardia anti doppio-tap (onclick + delegation possono sparare entrambi)
   if (_enteringChat) return;
@@ -2047,7 +2073,13 @@ async function openChatFromList(match, other) {
   goTo('chat');
   try {
     await subscribeToMessages();
-    console.log('[LiveMatch] Opened chat from list, matchId:', match.id, 'with:', other.name);
+    // ✅ Converge sulla chat canonica condivisa da entrambi gli utenti
+    const canonical = await resolveCanonicalMatch(other.id);
+    if (canonical && canonical.id !== currentMatch.id) {
+      currentMatch = canonical;
+      await subscribeToMessages();
+    }
+    console.log('[LiveMatch] Opened chat from list, chatId:', currentMatch.id, 'with:', other.name);
   } catch(e) {
     console.error('[LiveMatch] openChatFromList error:', e);
   } finally {
@@ -2855,32 +2887,17 @@ async function enterChat() {
   try {
     await subscribeToMessages();
 
-    // In background: cerca il match con messaggi (se ci sono più match tra gli stessi utenti)
+    // ✅ FIX chat divergente: converge sulla chat canonica condivisa da entrambi
+    // (il match accettato più vecchio della coppia). Sostituisce la vecchia logica
+    // "trova il match con messaggi" che NON era deterministica fra i due utenti
+    // e poteva farli finire su chat_id diversi.
     if (matchedProfile && currentProfile) {
-      const { data: allMatches } = await sb.from('match_requests')
-        .select('*')
-        .or(
-          'and(from_user.eq.' + matchedProfile.id + ',to_user.eq.' + currentProfile.id + '),' +
-          'and(from_user.eq.' + currentProfile.id + ',to_user.eq.' + matchedProfile.id + ')'
-        )
-        .eq('status', 'accepted')
-        .order('created_at', { ascending: false });
-
-      if (allMatches && allMatches.length > 0) {
-        let bestMatch = allMatches[0];
-        for (const m of allMatches) {
-          const { count } = await sb.from('messages')
-            .select('id', { count: 'exact', head: true })
-            .eq('chat_id', m.id);
-          if (count > 0) { bestMatch = m; break; }
-        }
-        // Se troviamo un match migliore (con messaggi), ricarica
-        if (bestMatch.id !== currentMatch?.id) {
-          currentMatch = bestMatch;
-          console.log('[LiveMatch] Switching to better matchId:', currentMatch.id);
-          loadChatScreen();
-          await subscribeToMessages();
-        }
+      const canonical = await resolveCanonicalMatch(matchedProfile.id);
+      if (canonical && canonical.id !== currentMatch?.id) {
+        currentMatch = canonical;
+        console.log('[LiveMatch] Switching to canonical chatId:', currentMatch.id);
+        loadChatScreen();
+        await subscribeToMessages();
       }
     }
   } catch(e) {
