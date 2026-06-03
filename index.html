@@ -845,7 +845,7 @@ body::before {
       <div class="popup-title">Match trovato!</div>
       <div class="popup-sub"><span id="incomingMatchName">Qualcuno</span> vuole fare match con te. Hai 30 secondi!</div>
       <button class="btn-primary" onclick="closePopup('popupIncomingMatch');goTo('match');startMatchTimer()">Vedi profilo</button>
-      <button class="btn-ghost" onclick="closePopup('popupIncomingMatch');rejectMatch()">Rifiuta</button>
+      <button class="btn-ghost" onclick="closePopup('popupIncomingMatch');rejectMatch(false)">Rifiuta</button>
     </div>
   </div>
 
@@ -2681,18 +2681,26 @@ async function expireMatch() {
   document.getElementById('popupExpired').classList.add('show');
 }
 
-async function rejectMatch() {
+async function rejectMatch(autoSearch = true) {
   stopMatchTimer();
   if (currentMatch) {
-    // B rifiuta → aggiorna status nel DB
     await sb.from('match_requests')
       .update({ status: 'rejected' })
       .eq('id', currentMatch.id);
   }
-  // Se A rifiuta prima di mandare la richiesta, non c'è nulla nel DB
   currentMatch = null;
   matchedProfile = null;
-  document.getElementById('popupReject').classList.add('show');
+
+  if (autoSearch) {
+    // ✅ Continua automaticamente la ricerca invece di tornare a home
+    goTo('searching');
+    document.getElementById('searchMsg').textContent = 'Cercando il prossimo…';
+    // Breve pausa prima di ricercare (UX + dà tempo al DB di aggiornare)
+    await new Promise(r => setTimeout(r, 600));
+    await findMatch();
+  } else {
+    document.getElementById('popupReject').classList.add('show');
+  }
 }
 
 async function acceptMatch() {
