@@ -3324,19 +3324,28 @@ async function getIsRequester() {
 function loadChatScreen() {
   if (!matchedProfile) return;
   const av = document.getElementById('chatAv');
-  if (matchedProfile.avatar_url) {
-    av.innerHTML = `<img src="${safeUrl(matchedProfile.avatar_url)}" alt="${escapeHtml(matchedProfile.name)}" style="width:100%;height:100%;object-fit:cover;"/>`;
-  } else {
-    av.textContent = (matchedProfile.name || '?')[0].toUpperCase();
+  if (av) {
+    if (matchedProfile.avatar_url) {
+      av.innerHTML = `<img src="${safeUrl(matchedProfile.avatar_url)}" alt="${escapeHtml(matchedProfile.name)}" style="width:100%;height:100%;object-fit:cover;"/>`;
+    } else {
+      av.textContent = (matchedProfile.name || '?')[0].toUpperCase();
+    }
   }
-  document.getElementById('chatName').textContent = matchedProfile.name + ', ' + matchedProfile.age;
-  document.getElementById('chatSysMsg').textContent = 'Match live con ' + matchedProfile.name + '!';
+  const nameEl = document.getElementById('chatName');
+  if (nameEl) nameEl.textContent = matchedProfile.name + ', ' + matchedProfile.age;
+  // ✅ FIX: NON toccare #chatSysMsg qui. Vive DENTRO #messages e viene rimosso
+  // dal msgs.innerHTML='' qui sotto; alla 2ª chiamata di loadChatScreen (es.
+  // switch alla chat canonica nel 2° match) sarebbe null → eccezione → il
+  // caricamento messaggi veniva saltato e la chat sembrava "vuota/nuova".
   const msgs = document.getElementById('messages');
-  msgs.innerHTML = '';
-  const sys = document.createElement('div');
-  sys.className = 'sys-msg';
-  sys.textContent = 'Oggi · Match live con ' + matchedProfile.name + '!';
-  msgs.appendChild(sys);
+  if (msgs) {
+    msgs.innerHTML = '';
+    const sys = document.createElement('div');
+    sys.className = 'sys-msg';
+    sys.id = 'chatSysMsg';
+    sys.textContent = 'Match live con ' + matchedProfile.name + '!';
+    msgs.appendChild(sys);
+  }
 }
 
 async function subscribeToMessages() {
