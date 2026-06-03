@@ -214,7 +214,7 @@ body::before {
 }
 
 /* ---- MATCH ---- */
-#s-match .body{flex:1;display:flex;flex-direction:column;padding:14px 18px;gap:12px;overflow:hidden;}
+#s-match .body{flex:1;display:flex;flex-direction:column;padding:14px 18px;gap:12px;overflow-y:auto;}
 .match-alert{
   background:rgba(255,77,109,0.1);border:0.5px solid rgba(255,77,109,0.25);
   border-radius:var(--r);padding:9px 14px;font-size:13px;color:var(--accent2);text-align:center;
@@ -348,11 +348,16 @@ body::before {
 }
 .send-btn:hover{transform:scale(1.05)}
 .send-btn:active{transform:scale(0.95)}
-.chat-photo-btn{
+.chat-photo-btn, .chat-mic-btn{
   width:38px;height:38px;border-radius:50%;
   background:var(--surface2);border:0.5px solid var(--border2);
   display:flex;align-items:center;justify-content:center;cursor:pointer;
   font-size:16px;flex-shrink:0;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+.chat-mic-btn.recording{
+  background:var(--accent);border-color:var(--accent);color:#fff;
+  font-size:13px;font-weight:600;animation:blink 1s infinite;
 }
 #chatPhotoInput{display:none;}
 
@@ -745,12 +750,67 @@ body::before {
   animation:spin 0.8s linear infinite;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---- GALLERIA FOTO PROFILO (vista match) ---- */
+.profile-gallery{display:flex;gap:8px;width:100%;justify-content:center;flex-wrap:wrap;}
+.gallery-thumb{
+  width:74px;height:74px;border-radius:12px;overflow:hidden;cursor:pointer;
+  border:0.5px solid var(--border2);background:var(--surface3);flex-shrink:0;
+  transition:transform 0.1s;
+}
+.gallery-thumb:active{transform:scale(0.95);}
+.gallery-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+
+/* ---- LIGHTBOX (ingrandimento foto) ---- */
+#lightbox{
+  position:fixed;inset:0;background:rgba(0,0,0,0.92);
+  display:none;align-items:center;justify-content:center;z-index:10000;
+  padding:20px;cursor:zoom-out;
+}
+#lightbox.show{display:flex;}
+#lightbox img{max-width:100%;max-height:100%;border-radius:12px;object-fit:contain;}
+#lightbox .lb-close{
+  position:absolute;top:max(14px,env(safe-area-inset-top));right:18px;
+  font-size:30px;color:#fff;background:none;border:none;cursor:pointer;line-height:1;
+}
+
+/* ---- AUDIO: recorder + player ---- */
+.audio-rec{display:flex;flex-direction:column;gap:8px;}
+.audio-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:11px 16px;border-radius:var(--r);
+  background:var(--surface2);border:0.5px solid var(--border2);color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;width:100%;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;min-height:46px;
+}
+.audio-btn.recording{background:rgba(255,77,109,0.15);border-color:rgba(255,77,109,0.5);color:var(--accent2);}
+.audio-rec audio{width:100%;height:40px;}
+.audio-timer-lbl{font-size:12px;color:var(--accent);font-weight:600;text-align:center;}
+.profile-audio{
+  width:100%;background:var(--surface3);border:0.5px solid var(--border2);
+  border-radius:var(--r);padding:10px 12px;display:flex;flex-direction:column;gap:6px;
+}
+.profile-audio .pa-q{font-size:12px;color:var(--text2);}
+.profile-audio audio{width:100%;height:36px;}
+.profile-why{
+  width:100%;text-align:center;font-style:italic;color:var(--accent2);
+  font-size:14px;padding:6px 10px;
+}
+.profile-why::before{content:'\201C';}
+.profile-why::after{content:'\201D';}
+.char-counter{font-size:11px;color:var(--text3);text-align:right;}
 </style>
 </head>
 <body>
 
 <!-- TOAST CONTAINER (fuori dall'app per evitare overflow:hidden) -->
 <div id="toastWrap" class="toast-wrap"></div>
+
+<!-- LIGHTBOX per ingrandire le foto del profilo -->
+<div id="lightbox" onclick="closeLightbox()">
+  <button class="lb-close" onclick="closeLightbox()" aria-label="Chiudi">✕</button>
+  <img id="lightboxImg" src="" alt="Foto"/>
+</div>
 
 <!-- LOADING -->
 <div id="loading">
@@ -940,6 +1000,27 @@ body::before {
         <label>BIO</label>
         <textarea id="regBio" placeholder="Raccontati in poche parole…"></textarea>
       </div>
+
+      <div class="field">
+        <label>PERCHÉ DOVRESTI USCIRE CON ME? <span style="color:var(--text3)">(max 30, facoltativo)</span></label>
+        <input type="text" id="regWhyDate" maxlength="30" placeholder="In 30 caratteri…" oninput="updateCharCount('regWhyDate','regWhyCount')"/>
+        <div class="char-counter" id="regWhyCount">0/30</div>
+      </div>
+
+      <div class="field">
+        <label>LA TUA DOMANDA PER L'AUDIO <span style="color:var(--text3)">(facoltativo)</span></label>
+        <input type="text" id="regAudioQuestion" maxlength="80" placeholder="Es. Qual è la tua passione?"/>
+      </div>
+      <div class="field">
+        <label>RISPOSTA VOCALE <span style="color:var(--text3)">(max 15s)</span></label>
+        <div class="audio-rec">
+          <button type="button" class="audio-btn" id="regRecBtn" onclick="toggleRec('reg')">🎤 Registra risposta</button>
+          <div class="audio-timer-lbl" id="regRecTimer" style="display:none">15s</div>
+          <audio id="regAudioPlayer" controls style="display:none"></audio>
+          <button type="button" class="link-btn" id="regRecRedo" style="display:none" onclick="redoRec('reg')">↺ Ri-registra</button>
+        </div>
+      </div>
+
       <div class="field">
         <label>EMAIL</label>
         <input type="email" id="regEmail" placeholder="nome@email.com"/>
@@ -1032,6 +1113,12 @@ body::before {
           <div class="meta-pill" style="color:var(--green)">● Online ora</div>
         </div>
         <div style="font-size:13px;color:var(--text2);text-align:center;line-height:1.5;" id="matchBio"></div>
+        <div class="profile-why" id="matchWhy" style="display:none"></div>
+        <div class="profile-gallery" id="matchGallery" style="display:none"></div>
+        <div class="profile-audio" id="matchAudio" style="display:none">
+          <div class="pa-q" id="matchAudioQ"></div>
+          <audio id="matchAudioPlayer" controls preload="none"></audio>
+        </div>
       </div>
       <div class="actions-row">
         <button class="btn-reject" onclick="rejectMatch()">✕ Rifiuta</button>
@@ -1100,6 +1187,7 @@ body::before {
     <div class="input-row">
       <div class="chat-photo-btn" onclick="document.getElementById('chatPhotoInput').click()">📸</div>
       <input type="file" id="chatPhotoInput" accept="image/*" onchange="sendPhotoMessage(event)"/>
+      <div class="chat-mic-btn" id="chatMicBtn" onclick="toggleChatVoice()" title="Messaggio vocale">🎤</div>
       <input type="text" id="chatInput" placeholder="Scrivi un messaggio…" onkeydown="if(event.key==='Enter')sendMessage()" oninput="handleChatInput()"/>
       <button class="send-btn" onclick="sendMessage()">➤</button>
     </div>
@@ -1255,6 +1343,25 @@ body::before {
         </select>
       </div>
       <div class="field"><label>BIO</label><textarea id="editBio" placeholder="Raccontati in poche parole…"></textarea></div>
+
+      <div class="field">
+        <label>PERCHÉ DOVRESTI USCIRE CON ME? <span style="color:var(--text3)">(max 30)</span></label>
+        <input type="text" id="editWhyDate" maxlength="30" placeholder="In 30 caratteri…" oninput="updateCharCount('editWhyDate','editWhyCount')"/>
+        <div class="char-counter" id="editWhyCount">0/30</div>
+      </div>
+      <div class="field">
+        <label>LA TUA DOMANDA PER L'AUDIO</label>
+        <input type="text" id="editAudioQuestion" maxlength="80" placeholder="Es. Qual è la tua passione?"/>
+      </div>
+      <div class="field">
+        <label>RISPOSTA VOCALE <span style="color:var(--text3)">(max 15s)</span></label>
+        <div class="audio-rec">
+          <button type="button" class="audio-btn" id="editRecBtn" onclick="toggleRec('edit')">🎤 Registra risposta</button>
+          <div class="audio-timer-lbl" id="editRecTimer" style="display:none">15s</div>
+          <audio id="editAudioPlayer" controls style="display:none"></audio>
+          <button type="button" class="link-btn" id="editRecRedo" style="display:none" onclick="redoRec('edit')">↺ Ri-registra / rimuovi</button>
+        </div>
+      </div>
 
       <div id="editError" class="error-msg" style="display:none"></div>
       <div id="editSuccess" class="success-msg" style="display:none"></div>
@@ -1776,6 +1883,21 @@ function openEditProfile() {
   document.getElementById('editOrientation').value = p.orientation || 'bisessuale';
   document.getElementById('editLookingFor').value = p.looking_for || 'entrambi';
   document.getElementById('editBio').value = p.bio || '';
+  document.getElementById('editWhyDate').value = p.why_date_me || '';
+  updateCharCount('editWhyDate', 'editWhyCount');
+  document.getElementById('editAudioQuestion').value = p.audio_question || '';
+
+  // Precompila audio esistente
+  resetRecUI('edit');
+  editAudioExistingUrl = p.audio_url || null;
+  if (p.audio_url) {
+    const player = document.getElementById('editAudioPlayer');
+    if (player) { player.src = p.audio_url; player.style.display = 'block'; }
+    const btn = document.getElementById('editRecBtn');
+    if (btn) btn.style.display = 'none';
+    const redo = document.getElementById('editRecRedo');
+    if (redo) redo.style.display = 'inline';
+  }
 
   // Precompila filtri
   const minAgeEl = document.getElementById('editMinAge');
@@ -1854,6 +1976,8 @@ async function saveEditProfile() {
   const orientation = document.getElementById('editOrientation').value;
   const looking_for = document.getElementById('editLookingFor').value;
   const bio = document.getElementById('editBio').value.trim();
+  const whyDate = document.getElementById('editWhyDate').value.trim();
+  const audioQuestion = document.getElementById('editAudioQuestion').value.trim();
 
   if (!name || !age || !city) {
     errEl.textContent = 'Nome, età e città sono obbligatori.';
@@ -1865,7 +1989,14 @@ async function saveEditProfile() {
   const minAge = parseInt(document.getElementById('editMinAge')?.value || 18);
   const maxAge = parseInt(document.getElementById('editMaxAge')?.value || 99);
   const maxDist = parseInt(document.getElementById('editMaxDist')?.value || 50);
-  const updates = { name, age, city, gender, orientation, looking_for, bio, min_age: minAge, max_age: maxAge, max_distance: maxDist };
+  const updates = { name, age, city, gender, orientation, looking_for, bio, min_age: minAge, max_age: maxAge, max_distance: maxDist,
+                    why_date_me: whyDate || null, audio_question: audioQuestion || null };
+
+  // Audio: se ne è stato registrato uno nuovo, caricalo; se è stato rimosso
+  // (redo senza nuova registrazione e nessun audio esistente) → null; altrimenti invariato.
+  const newAudioUrl = await uploadAudio('edit');
+  if (newAudioUrl) updates.audio_url = newAudioUrl;
+  else if (!editAudioExistingUrl) updates.audio_url = null;
 
   // Upload foto se cambiate
   const bucketFields = ['avatar_url', 'photo2_url', 'photo3_url'];
@@ -1992,7 +2123,7 @@ async function loadChatList() {
 
     const lastMsg = lastMsgs && lastMsgs.length > 0 ? lastMsgs[0] : null;
     const preview = lastMsg
-      ? (lastMsg.type === 'photo' ? '📸 Foto' : lastMsg.content)
+      ? (lastMsg.type === 'photo' ? '📸 Foto' : lastMsg.type === 'audio' ? '🎤 Messaggio vocale' : lastMsg.content)
       : 'Nessun messaggio ancora';
     const timeStr = lastMsg
       ? formatTime(new Date(lastMsg.created_at))
@@ -2213,6 +2344,8 @@ async function doRegister() {
   const orientation = document.getElementById('regOrientation').value;
   const looking_for = document.getElementById('regLookingFor').value || 'entrambi';
   const bio = document.getElementById('regBio').value.trim();
+  const whyDate = document.getElementById('regWhyDate').value.trim();
+  const audioQuestion = document.getElementById('regAudioQuestion').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const pwd = document.getElementById('regPassword').value;
   const btn = document.getElementById('btnRegister');
@@ -2243,6 +2376,16 @@ async function doRegister() {
     await sb.storage.from('avatars').upload(path, avatarFileToUpload, { upsert: true });
     const { data: urlData } = sb.storage.from('avatars').getPublicUrl(path);
     await sb.from('profiles').update({ avatar_url: urlData.publicUrl }).eq('id', currentUser.id);
+  }
+
+  // Salva risposta testuale + audio (tutti facoltativi)
+  const extraUpdates = {};
+  if (whyDate) extraUpdates.why_date_me = whyDate;
+  if (audioQuestion) extraUpdates.audio_question = audioQuestion;
+  const audioUrl = await uploadAudio('reg');
+  if (audioUrl) extraUpdates.audio_url = audioUrl;
+  if (Object.keys(extraUpdates).length) {
+    await sb.from('profiles').update(extraUpdates).eq('id', currentUser.id);
   }
 
   await loadProfile();
@@ -2338,6 +2481,117 @@ function previewAvatar(e) {
   avatarFileToUpload = file;
   const url = URL.createObjectURL(file);
   document.getElementById('avatarPreview').innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`;
+}
+
+// ============================================================
+// 6b. AUDIO — registrazione vocale (registrazione + modifica profilo)
+// ============================================================
+const audioBlobs = { reg: null, edit: null };   // blob registrato per contesto
+let editAudioExistingUrl = null;                 // url audio già salvato (in modifica)
+const _mediaRec = {};                            // ctx -> MediaRecorder
+const _audioChunks = {};                         // ctx -> []
+const _recTimers = {};                           // ctx -> interval
+
+function updateCharCount(inputId, counterId) {
+  const inp = document.getElementById(inputId);
+  const c = document.getElementById(counterId);
+  if (inp && c) c.textContent = (inp.value.length) + '/30';
+}
+
+async function toggleRec(ctx) {
+  const mr = _mediaRec[ctx];
+  if (mr && mr.state === 'recording') { stopRec(ctx); return; }
+
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    alert('La registrazione audio non è supportata su questo browser.');
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    alert('Permesso microfono negato o non disponibile.');
+    return;
+  }
+  _audioChunks[ctx] = [];
+  let rec;
+  try { rec = new MediaRecorder(stream); }
+  catch (e) { rec = new MediaRecorder(stream, { mimeType: 'audio/mp4' }); }
+  _mediaRec[ctx] = rec;
+  rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) _audioChunks[ctx].push(e.data); };
+  rec.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    const type = rec.mimeType || 'audio/webm';
+    const blob = new Blob(_audioChunks[ctx], { type });
+    audioBlobs[ctx] = blob;
+    const player = document.getElementById(ctx + 'AudioPlayer');
+    if (player) { player.src = URL.createObjectURL(blob); player.style.display = 'block'; }
+    const redo = document.getElementById(ctx + 'RecRedo');
+    if (redo) redo.style.display = 'inline';
+    const btn = document.getElementById(ctx + 'RecBtn');
+    if (btn) { btn.style.display = 'none'; btn.classList.remove('recording'); }
+    const timer = document.getElementById(ctx + 'RecTimer');
+    if (timer) timer.style.display = 'none';
+  };
+  rec.start();
+
+  const btn = document.getElementById(ctx + 'RecBtn');
+  if (btn) { btn.textContent = '■ Ferma'; btn.classList.add('recording'); }
+  let s = 15;
+  const timer = document.getElementById(ctx + 'RecTimer');
+  if (timer) { timer.style.display = 'block'; timer.textContent = s + 's'; }
+  if (_recTimers[ctx]) clearInterval(_recTimers[ctx]);
+  _recTimers[ctx] = setInterval(() => {
+    s--;
+    if (timer) timer.textContent = s + 's';
+    if (s <= 0) stopRec(ctx);
+  }, 1000);
+}
+
+function stopRec(ctx) {
+  if (_recTimers[ctx]) { clearInterval(_recTimers[ctx]); _recTimers[ctx] = null; }
+  const rec = _mediaRec[ctx];
+  if (rec && rec.state === 'recording') rec.stop();
+}
+
+function redoRec(ctx) {
+  audioBlobs[ctx] = null;
+  if (ctx === 'edit') editAudioExistingUrl = null; // segnala rimozione/sostituzione
+  const player = document.getElementById(ctx + 'AudioPlayer');
+  if (player) { player.removeAttribute('src'); player.style.display = 'none'; }
+  const redo = document.getElementById(ctx + 'RecRedo');
+  if (redo) redo.style.display = 'none';
+  const btn = document.getElementById(ctx + 'RecBtn');
+  if (btn) { btn.style.display = 'inline-flex'; btn.textContent = '🎤 Registra risposta'; btn.classList.remove('recording'); }
+}
+
+// Carica il blob audio nello Storage (bucket avatars, nome con timestamp = sempre INSERT)
+async function uploadAudio(ctx) {
+  const blob = audioBlobs[ctx];
+  if (!blob || !currentUser) return null;
+  const type = blob.type || 'audio/webm';
+  const ext = type.includes('mp4') ? 'm4a' : type.includes('mpeg') ? 'mp3' : type.includes('ogg') ? 'ogg' : 'webm';
+  const path = currentUser.id + '/voice-' + Date.now() + '.' + ext;
+  try {
+    const buf = await blob.arrayBuffer();
+    const { error } = await sb.storage.from('avatars').upload(path, buf, { contentType: type, upsert: false });
+    if (error) { console.error('[Audio] upload error:', error); return null; }
+    const { data } = sb.storage.from('avatars').getPublicUrl(path);
+    return data.publicUrl;
+  } catch (e) { console.error('[Audio] upload exception:', e); return null; }
+}
+
+// Reset UI del recorder a stato vuoto (usato aprendo i form)
+function resetRecUI(ctx) {
+  audioBlobs[ctx] = null;
+  const player = document.getElementById(ctx + 'AudioPlayer');
+  if (player) { player.removeAttribute('src'); player.style.display = 'none'; }
+  const redo = document.getElementById(ctx + 'RecRedo');
+  if (redo) redo.style.display = 'none';
+  const btn = document.getElementById(ctx + 'RecBtn');
+  if (btn) { btn.style.display = 'inline-flex'; btn.textContent = '🎤 Registra risposta'; btn.classList.remove('recording'); }
+  const timer = document.getElementById(ctx + 'RecTimer');
+  if (timer) timer.style.display = 'none';
 }
 
 // ============================================================
@@ -2593,6 +2847,54 @@ function renderMatchScreen(p) {
     if (cityEl) cityEl.textContent = p.city + ' · ' + dist + 'km';
   }
   document.getElementById('matchBio').textContent = p.bio || '';
+
+  // "Perché dovresti uscire con me"
+  const whyEl = document.getElementById('matchWhy');
+  if (whyEl) {
+    if (p.why_date_me) { whyEl.textContent = p.why_date_me; whyEl.style.display = 'block'; }
+    else { whyEl.textContent = ''; whyEl.style.display = 'none'; }
+  }
+
+  // Galleria foto (avatar + foto 2 + foto 3) — tap per ingrandire
+  const gal = document.getElementById('matchGallery');
+  if (gal) {
+    const photos = [p.avatar_url, p.photo2_url, p.photo3_url].filter(Boolean);
+    if (photos.length) {
+      gal.innerHTML = photos.map(u =>
+        `<div class="gallery-thumb" onclick="openLightbox('${safeUrl(u)}')"><img src="${safeUrl(u)}" alt="foto"/></div>`
+      ).join('');
+      gal.style.display = 'flex';
+    } else {
+      gal.innerHTML = ''; gal.style.display = 'none';
+    }
+  }
+
+  // Audio (domanda + risposta vocale)
+  const audioWrap = document.getElementById('matchAudio');
+  const audioPlayer = document.getElementById('matchAudioPlayer');
+  const audioQ = document.getElementById('matchAudioQ');
+  if (audioWrap && audioPlayer) {
+    if (p.audio_url) {
+      audioQ.textContent = '🎤 ' + (p.audio_question || 'Ascolta la sua risposta');
+      audioPlayer.src = p.audio_url;
+      audioWrap.style.display = 'flex';
+    } else {
+      audioPlayer.removeAttribute('src');
+      audioWrap.style.display = 'none';
+    }
+  }
+}
+
+function openLightbox(url) {
+  if (!url) return;
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightboxImg').src = url;
+  lb.classList.add('show');
+}
+function closeLightbox() {
+  const lb = document.getElementById('lightbox');
+  lb.classList.remove('show');
+  document.getElementById('lightboxImg').src = '';
 }
 
 function cancelSearch() {
@@ -3484,6 +3786,8 @@ function renderMessage(msg) {
 
   if (msg.type === 'photo') {
     bub.innerHTML = `<img src="${safeUrl(msg.content)}" style="max-width:180px;border-radius:10px;"/><div class="bubble-time">${time}</div>`;
+  } else if (msg.type === 'audio') {
+    bub.innerHTML = `<audio controls preload="none" src="${safeUrl(msg.content)}" style="max-width:210px;height:40px;vertical-align:middle;"></audio><div class="bubble-time">${time}</div>`;
   } else {
     bub.innerHTML = escapeHtml(msg.content) + `<div class="bubble-time">${time}</div>`;
   }
@@ -3558,6 +3862,75 @@ async function sendPhotoMessage(e) {
   } catch(e) {
     console.error('sendPhotoMessage error:', e);
   }
+}
+
+// ============================================================
+// 10b. MESSAGGI VOCALI IN CHAT — tap per avviare/fermare, max 15s
+// ============================================================
+let _chatRec = null, _chatChunks = [], _chatRecTimer = null;
+
+async function toggleChatVoice() {
+  // se sta registrando → ferma (e invia nell'onstop)
+  if (_chatRec && _chatRec.state === 'recording') { stopChatVoice(); return; }
+  if (!currentMatch || !currentProfile) return;
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    alert('La registrazione audio non è supportata su questo browser.');
+    return;
+  }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { alert('Permesso microfono negato o non disponibile.'); return; }
+
+  _chatChunks = [];
+  let rec;
+  try { rec = new MediaRecorder(stream); }
+  catch (e) { rec = new MediaRecorder(stream, { mimeType: 'audio/mp4' }); }
+  _chatRec = rec;
+  rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) _chatChunks.push(e.data); };
+  rec.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    if (_chatRecTimer) { clearInterval(_chatRecTimer); _chatRecTimer = null; }
+    setChatMicUI(false);
+    const type = rec.mimeType || 'audio/webm';
+    const blob = new Blob(_chatChunks, { type });
+    if (blob.size > 0) await sendVoiceMessage(blob, type);
+  };
+  rec.start();
+
+  setChatMicUI(true, 15);
+  let s = 15;
+  if (_chatRecTimer) clearInterval(_chatRecTimer);
+  _chatRecTimer = setInterval(() => {
+    s--;
+    setChatMicUI(true, s);
+    if (s <= 0) stopChatVoice();
+  }, 1000);
+}
+
+function stopChatVoice() {
+  if (_chatRec && _chatRec.state === 'recording') _chatRec.stop();
+}
+
+function setChatMicUI(recording, secs) {
+  const btn = document.getElementById('chatMicBtn');
+  if (!btn) return;
+  if (recording) { btn.classList.add('recording'); btn.textContent = (secs != null ? secs : '■'); }
+  else { btn.classList.remove('recording'); btn.textContent = '🎤'; }
+}
+
+async function sendVoiceMessage(blob, type) {
+  if (!blob || !currentMatch || !currentProfile) return;
+  try {
+    const ext = type.includes('mp4') ? 'm4a' : type.includes('mpeg') ? 'mp3' : type.includes('ogg') ? 'ogg' : 'webm';
+    const path = currentMatch.id + '/voice-' + currentProfile.id + '-' + Date.now() + '.' + ext;
+    const buf = await blob.arrayBuffer();
+    const { error } = await sb.storage.from('live-photos').upload(path, buf, { contentType: type, upsert: true });
+    if (error) { console.error('[Voice] upload error:', error); return; }
+    const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
+    const msg = { chat_id: currentMatch.id, sender_id: currentProfile.id, content: urlData.publicUrl, type: 'audio' };
+    renderMessage({ ...msg, sender: currentProfile, created_at: new Date().toISOString() });
+    await sb.from('messages').insert(msg);
+  } catch (e) { console.error('[Voice] send error:', e); }
 }
 
 let typingTimeout = null;
