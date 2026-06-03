@@ -1002,7 +1002,7 @@ body::before {
       </div>
       <div class="waiting-label">Ricerca in corso…</div>
       <div class="waiting-sub" id="searchMsg">Cercando tra gli utenti online…</div>
-      <button class="btn-ghost" style="width:200px" onclick="cancelSearch()">Annulla</button>
+      <button class="btn-ghost" style="width:200px" onclick="cancelSearch()">← Torna in home</button>
     </div>
   </div>
 
@@ -2683,19 +2683,29 @@ async function expireMatch() {
 
 async function rejectMatch(autoSearch = true) {
   stopMatchTimer();
+
   if (currentMatch) {
+    // Aggiorna record esistente a 'rejected'
     await sb.from('match_requests')
       .update({ status: 'rejected' })
       .eq('id', currentMatch.id);
+  } else if (matchedProfile && currentProfile) {
+    // ✅ FIX: nessun record in DB ancora (A ha visto B senza accettare)
+    // Crea un record 'rejected' così B non ricompare nelle prossime ricerche
+    await sb.from('match_requests').insert({
+      from_user: currentProfile.id,
+      to_user: matchedProfile.id,
+      status: 'rejected'
+    }).catch(() => {}); // ignora race condition / RLS errors
   }
+
   currentMatch = null;
   matchedProfile = null;
 
   if (autoSearch) {
-    // ✅ Continua automaticamente la ricerca invece di tornare a home
+    // Continua automaticamente la ricerca saltando l'utente appena rifiutato
     goTo('searching');
     document.getElementById('searchMsg').textContent = 'Cercando il prossimo…';
-    // Breve pausa prima di ricercare (UX + dà tempo al DB di aggiornare)
     await new Promise(r => setTimeout(r, 600));
     await findMatch();
   } else {
