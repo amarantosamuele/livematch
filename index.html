@@ -1406,11 +1406,34 @@ let photoSecs = 60;
 let matchSecs = 30;
 let photoCapturedFile = null;
 let realtimeChannel = null;
+let photoReqChannel = null;
+let photoFulfilledChannel = null;
 let msgChannel = null;
 let onlineChannel = null;
 let avatarFileToUpload = null;
+let currentAccessToken = null; // JWT della sessione, per richieste keepalive
 
 
+// ============================================================
+// SICUREZZA — escape di stringhe utente prima dell'innerHTML
+// ============================================================
+// Evita stored XSS: nomi, bio, messaggi sono contenuti dall'utente.
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+// Per URL inseriti in attributi src: blocca schemi pericolosi e neutralizza apici.
+function safeUrl(url) {
+  if (!url) return '';
+  const s = String(url).trim();
+  if (/^\s*(javascript|data|vbscript):/i.test(s)) return '';
+  return s.replace(/"/g, '%22').replace(/'/g, '%27');
+}
 
 
 // ============================================================
@@ -1604,17 +1627,18 @@ function showToast({ profile, type, matchData }) {
 
   const wrap = document.getElementById('toastWrap');
 
+  const safeName = escapeHtml(profile.name);
   const avHtml = profile.avatar_url
-    ? `<img src="${profile.avatar_url}" alt="${profile.name}"/>`
-    : profile.name[0].toUpperCase();
+    ? `<img src="${safeUrl(profile.avatar_url)}" alt="${safeName}"/>`
+    : escapeHtml((profile.name || '?')[0].toUpperCase());
 
   const titleText = type === 'photo'
-    ? `📸 ${profile.name} ti chiede una foto`
-    : `💘 ${profile.name} vuole fare match!`;
+    ? `📸 ${safeName} ti chiede una foto`
+    : `💘 ${safeName} vuole fare match!`;
 
   const subText = type === 'photo'
     ? 'Hai 60 secondi per scattare una foto dal vivo'
-    : `${profile.age} anni · ${profile.city} · Hai 60s per rispondere`;
+    : `${escapeHtml(profile.age)} anni · ${escapeHtml(profile.city)} · Hai 60s per rispondere`;
 
   const actionsHtml = type === 'photo'
     ? `<button class="toast-btn view" onclick="toastViewProfile()">Vedi profilo</button>
@@ -1948,8 +1972,8 @@ async function loadChatList() {
   for (const match of matches) {
     const otherId = match.from_user === currentProfile.id ? match.to_user : match.from_user;
 
-    // Carica profilo dell'altro utente
-    const { data: other } = await sb.from('profiles').select('*').eq('id', otherId).single();
+    // Carica profilo dell'altro utente (view pubblica, senza dati sensibili)
+    const { data: other } = await sb.from('profiles_public').select('*').eq('id', otherId).single();
     if (!other) continue;
 
     // Carica ultimo messaggio
@@ -1975,8 +1999,8 @@ async function loadChatList() {
     item.dataset.chatId = itemId;
 
     const avHtml = other.avatar_url
-      ? `<img src="${other.avatar_url}" alt="${other.name}"/>`
-      : other.name[0].toUpperCase();
+      ? `<img src="${safeUrl(other.avatar_url)}" alt="${escapeHtml(other.name)}"/>`
+      : escapeHtml((other.name || '?')[0].toUpperCase());
 
     const onlineDot = other.is_online
       ? '<div class="chat-list-online"></div>'
@@ -1985,10 +2009,10 @@ async function loadChatList() {
     item.innerHTML = `
       <div class="chat-list-av">${avHtml}${onlineDot}</div>
       <div class="chat-list-info">
-        <div class="chat-list-name">${other.name}, ${other.age}</div>
-        <div class="chat-list-preview">${preview}</div>
+        <div class="chat-list-name">${escapeHtml(other.name)}, ${escapeHtml(other.age)}</div>
+        <div class="chat-list-preview">${escapeHtml(preview)}</div>
       </div>
-      <div class="chat-list-time">${timeStr}</div>
+      <div class="chat-list-time">${escapeHtml(timeStr)}</div>
     `;
     list.appendChild(item);
   }
@@ -2034,6 +2058,7 @@ async function init() {
     const { data: { session } } = await withTimeout(sb.auth.getSession(), 6000);
     if (session) {
       currentUser = session.user;
+      currentAccessToken = session.access_token;
       await loadProfile();
       goTo('waiting');
       setupOnlinePresence();
@@ -2055,6 +2080,7 @@ async function init() {
 
   sb.auth.onAuthStateChange(async (_event, session) => {
     if (session) {
+      currentAccessToken = session.access_token;
       if (!currentUser) {
         // Prima autenticazione
         currentUser = session.user;
@@ -2078,6 +2104,7 @@ async function init() {
       // Logout da un altro tab
       currentUser = null;
       currentProfile = null;
+      currentAccessToken = null;
       goTo('auth');
     }
   });
@@ -2126,6 +2153,7 @@ async function doLogin() {
   btn.textContent = 'Accedi';
   if (error) { err.textContent = error.message; err.style.display = 'block'; return; }
   currentUser = data.user;
+  currentAccessToken = data.session?.access_token || currentAccessToken;
   await loadProfile();
   setupOnlinePresence();
   subscribeToMatches();
@@ -2161,6 +2189,7 @@ async function doRegister() {
   if (error) { btn.disabled = false; btn.textContent = 'Crea account →'; err.textContent = error.message; err.style.display = 'block'; return; }
 
   currentUser = data.user;
+  currentAccessToken = data.session?.access_token || currentAccessToken;
 
   // Upload avatar se presente
   if (avatarFileToUpload && currentUser) {
@@ -2185,7 +2214,7 @@ async function doLogout() {
   document.removeEventListener('visibilitychange', handleVisibility);
   await setOffline();
   await sb.auth.signOut();
-  currentUser = null; currentProfile = null;
+  currentUser = null; currentProfile = null; currentAccessToken = null;
   goTo('auth');
 }
 
@@ -2221,7 +2250,7 @@ function renderProfileScreen(p) {
   loadRematchPref();
   const av = document.getElementById('profileBigAv');
   if (p.avatar_url) {
-    av.innerHTML = `<img src="${p.avatar_url}" alt="${p.name}"/>`;
+    av.innerHTML = `<img src="${safeUrl(p.avatar_url)}" alt="${escapeHtml(p.name)}"/>`;
   } else {
     av.textContent = p.name ? p.name[0].toUpperCase() : '?';
   }
@@ -2233,8 +2262,8 @@ function renderProfileScreen(p) {
   let photosHtml = '';
   if (p.photo2_url || p.photo3_url) {
     photosHtml = '<div style="display:flex;gap:6px;margin-top:4px;">';
-    if (p.photo2_url) photosHtml += `<img src="${p.photo2_url}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;border:0.5px solid var(--border2)"/>`;
-    if (p.photo3_url) photosHtml += `<img src="${p.photo3_url}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;border:0.5px solid var(--border2)"/>`;
+    if (p.photo2_url) photosHtml += `<img src="${safeUrl(p.photo2_url)}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;border:0.5px solid var(--border2)"/>`;
+    if (p.photo3_url) photosHtml += `<img src="${safeUrl(p.photo3_url)}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;border:0.5px solid var(--border2)"/>`;
     photosHtml += '</div>';
   }
   const bioEl = document.getElementById('profileBio');
@@ -2335,21 +2364,20 @@ function handleVisibility() {
 }
 
 function setOfflineSync() {
-  // Usa sendBeacon per garantire l'invio anche quando la tab si chiude
+  // keepalive fetch: funziona anche quando la pagina sta chiudendo (mobile background)
   if (!currentUser) return;
-  const url = 'https://dmzozvidylvdaclzyeqk.supabase.co/rest/v1/profiles?id=eq.' + currentUser.id;
   const body = JSON.stringify({ is_online: false, last_seen: new Date().toISOString() });
-  if (navigator.sendBeacon) {
-    const blob = new Blob([body], { type: 'application/json' });
-    // sendBeacon non supporta PATCH, usiamo fetch con keepalive
-  }
-  // keepalive fetch: funziona anche quando la pagina sta chiudendo
-  fetch('https://dmzozvidylvdaclzyeqk.supabase.co/rest/v1/profiles?id=eq.' + currentUser.id, {
+  // ✅ FIX: l'Authorization deve usare il JWT della sessione (non l'anon key) —
+  //   altrimenti le RLS bloccano l'UPDATE e l'utente resta "online" fantasma.
+  //   Inoltre prima era una stringa tra apici singoli: inviava il testo
+  //   letterale "${SUPABASE_ANON_KEY}" invece del valore.
+  const token = currentAccessToken || SUPABASE_ANON_KEY;
+  fetch(SUPABASE_URL + '/rest/v1/profiles?id=eq.' + currentUser.id, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtem96dmlkeWx2ZGFjbHp5ZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzgyODQsImV4cCI6MjA5NTQxNDI4NH0.dmdHfeoXrPHCpFzOMxoVo8TtTuj1M9KRPnOUWRMn2sE',
-      'Authorization': 'Bearer ${SUPABASE_ANON_KEY}',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + token,
       'Prefer': 'return=minimal'
     },
     body: body,
@@ -2368,7 +2396,8 @@ async function loadOnlineCount() {
   if (!currentUser) return;
   // ✅ Soglia 90s (era 3s) — allineata al heartbeat di 30s con margine
   const threshold = new Date(Date.now() - 90 * 1000).toISOString();
-  const { count, error } = await sb.from('profiles')
+  // Legge dalla view pubblica (senza email/GPS) — funziona anche dopo il lockdown RLS.
+  const { count, error } = await sb.from('profiles_public')
     .select('id', { count: 'exact', head: true })
     .gte('last_seen', threshold)
     .neq('id', currentUser.id);
@@ -2408,7 +2437,9 @@ async function findMatch() {
 
   // ✅ Soglia 90s (allineata al heartbeat di 30s)
   const onlineThreshold = new Date(Date.now() - 90 * 1000).toISOString();
-  const { data: candidates } = await sb.from('profiles')
+  // Candidati dalla view pubblica (no email/GPS). Nota: senza latitude/longitude
+  // il filtro distanza si disattiva da solo (le guardie `c.latitude` lo gestiscono).
+  const { data: candidates } = await sb.from('profiles_public')
     .select('*')
     .gte('last_seen', onlineThreshold)
     .neq('id', currentProfile.id)
@@ -2503,7 +2534,7 @@ function isCompatible(me, other) {
 function renderMatchScreen(p) {
   const av = document.getElementById('matchAv');
   if (p.avatar_url) {
-    av.innerHTML = `<img src="${p.avatar_url}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`;
+    av.innerHTML = `<img src="${safeUrl(p.avatar_url)}" alt="${escapeHtml(p.name)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`;
   } else {
     av.textContent = p.name[0].toUpperCase();
   }
@@ -2566,9 +2597,9 @@ let waitingRespTimer = null;
 function renderWaitingResponse(partner) {
   const av = document.getElementById('waitingRespAv');
   if (partner.avatar_url) {
-    av.innerHTML = '<img src="' + partner.avatar_url + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>';
+    av.innerHTML = '<img src="' + safeUrl(partner.avatar_url) + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>';
   } else {
-    av.textContent = partner.name[0].toUpperCase();
+    av.textContent = (partner.name || '?')[0].toUpperCase();
   }
   document.getElementById('waitingRespName').textContent = partner.name;
 
@@ -2606,7 +2637,7 @@ function renderWaitingResponse(partner) {
         clearInterval(waitingRespTimer); waitingRespTimer = null;
         if (!matchedProfile) {
           const otherId = currentMatch.to_user === currentProfile.id ? currentMatch.from_user : currentMatch.to_user;
-          const { data: other } = await sb.from('profiles').select('*').eq('id', otherId).single();
+          const { data: other } = await sb.from('profiles_public').select('*').eq('id', otherId).single();
           if (other) matchedProfile = other;
         }
         showAcceptedScreen();
@@ -2844,7 +2875,7 @@ function showAcceptedScreen() {
   const meAv = document.getElementById('acceptedAvMe');
   if (currentProfile) {
     if (currentProfile.avatar_url) {
-      meAv.innerHTML = '<img src="' + currentProfile.avatar_url + '" style="width:100%;height:100%;object-fit:cover;"/>';
+      meAv.innerHTML = '<img src="' + safeUrl(currentProfile.avatar_url) + '" style="width:100%;height:100%;object-fit:cover;"/>';
     } else {
       meAv.textContent = currentProfile.name[0].toUpperCase();
     }
@@ -2853,7 +2884,7 @@ function showAcceptedScreen() {
   const themAv = document.getElementById('acceptedAvThem');
   if (matchedProfile) {
     if (matchedProfile.avatar_url) {
-      themAv.innerHTML = '<img src="' + matchedProfile.avatar_url + '" style="width:100%;height:100%;object-fit:cover;"/>';
+      themAv.innerHTML = '<img src="' + safeUrl(matchedProfile.avatar_url) + '" style="width:100%;height:100%;object-fit:cover;"/>';
     } else {
       themAv.textContent = matchedProfile.name[0].toUpperCase();
     }
@@ -3256,9 +3287,9 @@ function loadChatScreen() {
   if (!matchedProfile) return;
   const av = document.getElementById('chatAv');
   if (matchedProfile.avatar_url) {
-    av.innerHTML = `<img src="${matchedProfile.avatar_url}" alt="${matchedProfile.name}" style="width:100%;height:100%;object-fit:cover;"/>`;
+    av.innerHTML = `<img src="${safeUrl(matchedProfile.avatar_url)}" alt="${escapeHtml(matchedProfile.name)}" style="width:100%;height:100%;object-fit:cover;"/>`;
   } else {
-    av.textContent = matchedProfile.name[0].toUpperCase();
+    av.textContent = (matchedProfile.name || '?')[0].toUpperCase();
   }
   document.getElementById('chatName').textContent = matchedProfile.name + ', ' + matchedProfile.age;
   document.getElementById('chatSysMsg').textContent = 'Match live con ' + matchedProfile.name + '!';
@@ -3285,7 +3316,7 @@ async function subscribeToMessages() {
 
   async function getSender(senderId) {
     if (profileCache[senderId]) return profileCache[senderId];
-    const { data } = await sb.from('profiles').select('name,avatar_url').eq('id', senderId).single();
+    const { data } = await sb.from('profiles_public').select('name,avatar_url').eq('id', senderId).single();
     if (data) profileCache[senderId] = data;
     return data;
   }
@@ -3384,7 +3415,7 @@ function renderMessage(msg) {
     const av = document.createElement('div');
     av.className = 'bubble-av-sm';
     if (msg.sender?.avatar_url) {
-      av.innerHTML = `<img src="${msg.sender.avatar_url}" style="width:100%;height:100%;object-fit:cover;"/>`;
+      av.innerHTML = `<img src="${safeUrl(msg.sender.avatar_url)}" style="width:100%;height:100%;object-fit:cover;"/>`;
     } else {
       av.textContent = (msg.sender?.name || '?')[0].toUpperCase();
     }
@@ -3397,9 +3428,9 @@ function renderMessage(msg) {
   const time = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
 
   if (msg.type === 'photo') {
-    bub.innerHTML = `<img src="${msg.content}" style="max-width:180px;border-radius:10px;"/><div class="bubble-time">${time}</div>`;
+    bub.innerHTML = `<img src="${safeUrl(msg.content)}" style="max-width:180px;border-radius:10px;"/><div class="bubble-time">${time}</div>`;
   } else {
-    bub.innerHTML = msg.content + `<div class="bubble-time">${time}</div>`;
+    bub.innerHTML = escapeHtml(msg.content) + `<div class="bubble-time">${time}</div>`;
   }
   row.appendChild(bub);
   msgs.appendChild(row);
@@ -3498,7 +3529,12 @@ async function subscribeToMatches() {
 
   // Ascolta nuovi match_requests dove sei il destinatario (to_user)
   // usando Supabase Realtime postgres_changes
-  if (realtimeChannel) sb.removeChannel(realtimeChannel);
+  // ✅ FIX: rimuovi TUTTI i canali precedenti, non solo realtimeChannel.
+  // Senza questo, una seconda chiamata a subscribeToMatches() (es. da goHome
+  // o dal doppio invio in init) lanciava "cannot add callbacks after subscribe()".
+  if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+  if (photoReqChannel) { sb.removeChannel(photoReqChannel); photoReqChannel = null; }
+  if (photoFulfilledChannel) { sb.removeChannel(photoFulfilledChannel); photoFulfilledChannel = null; }
 
   console.log('[LiveMatch] Subscribed to matches for', currentProfile.id);
   realtimeChannel = sb.channel('match-requests-incoming-' + currentProfile.id)
@@ -3512,7 +3548,7 @@ async function subscribeToMatches() {
       if (req.status !== 'pending') return;
 
       // Carica il profilo di chi ci ha inviato il match
-      const { data: fromProfile } = await sb.from('profiles')
+      const { data: fromProfile } = await sb.from('profiles_public')
         .select('*').eq('id', req.from_user).single();
       if (!fromProfile) return;
 
@@ -3543,7 +3579,7 @@ async function subscribeToMatches() {
           currentMatch = req;
           if (!matchedProfile) {
             const otherId = req.from_user === currentProfile.id ? req.to_user : req.from_user;
-            const { data: otherProfile } = await sb.from('profiles')
+            const { data: otherProfile } = await sb.from('profiles_public')
               .select('*').eq('id', otherId).single();
             if (otherProfile) { matchedProfile = otherProfile; renderMatchScreen(otherProfile); }
           }
@@ -3559,7 +3595,7 @@ async function subscribeToMatches() {
     .subscribe();
 
   // Ascolta INSERT su photo_requests → B riceve richiesta foto da A
-  sb.channel('photo-requests-incoming-' + currentProfile.id)
+  photoReqChannel = sb.channel('photo-requests-incoming-' + currentProfile.id)
     .on('postgres_changes', {
       event: 'INSERT',
       schema: 'public',
@@ -3567,7 +3603,7 @@ async function subscribeToMatches() {
       filter: 'to_user=eq.' + currentProfile.id
     }, async (payload) => {
       const req = payload.new;
-      const { data: fromProfile } = await sb.from('profiles')
+      const { data: fromProfile } = await sb.from('profiles_public')
         .select('*').eq('id', req.from_user).single();
       if (!fromProfile) return;
       const { data: matchData } = await sb.from('match_requests')
@@ -3581,7 +3617,7 @@ async function subscribeToMatches() {
 
   // Ascolta UPDATE su photo_requests
   // Quando entrambi inviano la foto → vai in chat
-  sb.channel('photo-fulfilled-' + currentProfile.id)
+  photoFulfilledChannel = sb.channel('photo-fulfilled-' + currentProfile.id)
     .on('postgres_changes', {
       event: 'UPDATE',
       schema: 'public',
@@ -3605,7 +3641,7 @@ async function subscribeToMatches() {
         }
         if (!matchedProfile) {
           const otherId = req.from_user === currentProfile.id ? req.to_user : req.from_user;
-          const { data: other } = await sb.from('profiles').select('*').eq('id', otherId).single();
+          const { data: other } = await sb.from('profiles_public').select('*').eq('id', otherId).single();
           if (other) matchedProfile = other;
         }
         const active = document.querySelector('.screen.active');
@@ -3649,7 +3685,7 @@ async function subscribeToMatches() {
           }
           if (!matchedProfile) {
             const otherId = req.from_user === currentProfile.id ? req.to_user : req.from_user;
-            const { data: other } = await sb.from('profiles').select('*').eq('id', otherId).single();
+            const { data: other } = await sb.from('profiles_public').select('*').eq('id', otherId).single();
             if (other) matchedProfile = other;
           }
           if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
@@ -3674,7 +3710,8 @@ function leaveChat() {
 // START
 // ============================================================
 init().then(() => {
-  if (currentProfile) subscribeToMatches();
+  // init() sottoscrive già i match (sia nel ramo sessione che in onAuthStateChange).
+  // Nessuna ri-sottoscrizione qui: evita teardown/rebuild inutile dei canali.
 }).catch(e => {
   console.error('[LiveMatch] Fatal init error:', e);
   document.getElementById('loading').style.display = 'none';
