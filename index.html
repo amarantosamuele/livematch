@@ -2054,11 +2054,31 @@ async function init() {
   }
 
   sb.auth.onAuthStateChange(async (_event, session) => {
-    if (session && !currentUser) {
-      currentUser = session.user;
-      await loadProfile();
-      goTo('waiting');
-      setupOnlinePresence();
+    if (session) {
+      if (!currentUser) {
+        // Prima autenticazione
+        currentUser = session.user;
+        await loadProfile();
+        goTo('waiting');
+        setupOnlinePresence();
+        subscribeToMatches();
+      } else if (session.user.id !== currentUser.id) {
+        // ✅ FIX: utente diverso loggato (es. altro tab) → ricarica con nuovo utente
+        console.warn('[LiveMatch] Utente cambiato, ricarico sessione');
+        currentUser = session.user;
+        currentProfile = null;
+        currentMatch = null;
+        matchedProfile = null;
+        await loadProfile();
+        goTo('waiting');
+        setupOnlinePresence();
+        subscribeToMatches();
+      }
+    } else if (!session && currentUser) {
+      // Logout da un altro tab
+      currentUser = null;
+      currentProfile = null;
+      goTo('auth');
     }
   });
 }
@@ -2708,6 +2728,19 @@ async function acceptMatch() {
     }).select().single();
 
     if (error) {
+      console.error('[LiveMatch] acceptMatch insert error:', error.message, error.code);
+
+      // RLS error = sessione scaduta/cambiata → ricarica la pagina
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        console.warn('[LiveMatch] RLS error — sessione non valida, ricarico');
+        const { data: { session } } = await sb.auth.getSession();
+        if (session && session.user.id !== currentProfile.id) {
+          // Sessione cambiata: ricarica app con nuovo utente
+          location.reload();
+          return;
+        }
+      }
+
       // Race condition: qualcuno ha inserito nel frattempo, ricarica
       const { data: retry } = await sb.from('match_requests')
         .select('*')
