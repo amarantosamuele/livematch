@@ -4,16 +4,33 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <title>LiveMatch</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="vendor/supabase.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
 <style>
+/* ===== TEMA CHIARO (default) ===== */
 :root {
+  --bg: #fbfbfd;
+  --surface: #ffffff;
+  --surface2: #f4f4f8;
+  --surface3: #ececf2;
+  --accent: #ff4d6d;
+  --accent2: #ff8fa3;
+  --green: #16b886;
+  --blue: #2f7fe0;
+  --text: #1a1a24;
+  --text2: #6c6c82;
+  --text3: #a6a6ba;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --r: 16px;
+  --r2: 24px;
+}
+/* ===== TEMA SCURO (opzionale) ===== */
+html.theme-dark {
   --bg: #0a0a0f;
   --surface: #13131a;
   --surface2: #1c1c26;
   --surface3: #252535;
-  --accent: #ff4d6d;
-  --accent2: #ff8fa3;
   --green: #2dd4a0;
   --blue: #4d9fff;
   --text: #f0f0f8;
@@ -21,8 +38,6 @@
   --text3: #55556a;
   --border: rgba(255,255,255,0.06);
   --border2: rgba(255,255,255,0.12);
-  --r: 16px;
-  --r2: 24px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -30,15 +45,15 @@ body {
   background: var(--surface);
   color: var(--text);
   min-height: 100vh;
+  min-height: 100dvh;
   min-height: -webkit-fill-available;
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  /* Padding safe area per iOS */
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  /* ✅ NIENTE safe-area sul body: l'app riempie da bordo a bordo. Le safe-area
+     le gestiscono i singoli componenti (topbar in alto, bottom-nav/input in
+     basso). Prima il padding del body lasciava un gap sotto al menu. */
+  margin: 0;
   /* Disabilita selezione testo e touch callout su mobile */
   -webkit-user-select: none;
   user-select: none;
@@ -63,7 +78,7 @@ input, textarea {
   #app {
     width: 100vw !important;
     min-height: 100vh !important;
-    min-height: -webkit-fill-available !important;
+    min-height: 100dvh !important;
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
@@ -83,7 +98,7 @@ body::before {
 #app {
   width: 100%;
   min-height: 100vh;
-  min-height: -webkit-fill-available;
+  min-height: 100dvh;
   background: var(--surface);
   border-radius: 0;
   border: none;
@@ -138,6 +153,8 @@ body::before {
 .field input:focus, .field textarea:focus, .field select:focus { border-color: rgba(255,77,109,0.5); }
 .field select option { background: var(--surface2); }
 .field textarea { resize: none; height: 80px; }
+/* Normalizza il campo data su iOS (evita altezze/accavallamenti strani) */
+.field input[type="date"]{ min-height:48px; line-height:1.2; -webkit-appearance:none; appearance:none; display:block; }
 .row2 { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
 .btn-primary {
   width:100%;padding:14px;border-radius:var(--r);
@@ -186,12 +203,18 @@ body::before {
 .radar-wrap{position:relative;width:160px;height:160px;}
 .radar-ring{
   position:absolute;border-radius:50%;border:1px solid var(--accent);
-  top:50%;left:50%;transform:translate(-50%,-50%);
-  animation:radar-expand 3s infinite;opacity:0;
+  top:50%;left:50%;width:180px;height:180px;margin:-90px 0 0 -90px;
+  /* ✅ usa transform:scale (fluido, GPU) invece di animare width/height,
+     con fade-in per evitare lo "scatto" e ease-out per un flusso continuo */
+  animation:radar-pulse 3s ease-out infinite;opacity:0;will-change:transform,opacity;
 }
 .radar-ring:nth-child(2){animation-delay:1s}
 .radar-ring:nth-child(3){animation-delay:2s}
-@keyframes radar-expand{0%{width:50px;height:50px;opacity:0.7}100%{width:180px;height:180px;opacity:0}}
+@keyframes radar-pulse{
+  0%{transform:scale(0.3);opacity:0}
+  12%{opacity:0.7}
+  100%{transform:scale(1);opacity:0}
+}
 .radar-center{
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   width:54px;height:54px;border-radius:50%;
@@ -568,6 +591,10 @@ body::before {
 /* ---- EDIT PROFILE ---- */
 #s-edit .body{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;}
 #s-edit .body::-webkit-scrollbar{width:3px}
+#s-plus .body{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;}
+#s-plus .body::-webkit-scrollbar{width:3px}
+#s-plus .plus-code{font-family:'DM Sans',monospace;font-size:30px;letter-spacing:5px;font-weight:600;color:var(--accent);}
+#s-plus .btn-copy{flex:0 0 auto;width:auto;min-height:48px;padding:0 22px;background:var(--surface2);border:0.5px solid var(--border2);color:var(--text);}
 #s-edit .body::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
 .photos-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
 .photo-slot{
@@ -799,7 +826,21 @@ body::before {
 .profile-why::before{content:'\201C';}
 .profile-why::after{content:'\201D';}
 .char-counter{font-size:11px;color:var(--text3);text-align:right;}
+
+/* ===== Compatibilità tema chiaro/scuro ===== */
+/* Avatar di fallback (iniziali, quando manca la foto): sfondo colorato così
+   la lettera bianca resta leggibile sia in chiaro che in scuro. */
+.user-avatar-sm, .big-avatar, .chat-av, .bubble-av-sm,
+.profile-big-av, .chat-list-av, .waiting-resp-av {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+}
+/* Numero del countdown (SVG) segue il colore del tema */
+#tTxt { fill: var(--text); }
 </style>
+<script>
+  /* Applica il tema salvato PRIMA del render (niente flash). Default: chiaro. */
+  (function(){ try { if (localStorage.getItem('livematch_theme') === 'dark') document.documentElement.classList.add('theme-dark'); } catch(e){} })();
+</script>
 </head>
 <body>
 
@@ -863,8 +904,9 @@ body::before {
     <div class="popup-card">
       <div class="popup-emoji">⏳</div>
       <div class="popup-title">Limite raggiunto</div>
-      <div class="popup-sub">Hai raggiunto il limite di 10 match al giorno. Torna domani!</div>
-      <button class="btn-primary" onclick="closePopup('popupDailyLimit')">Ok</button>
+      <div class="popup-sub" id="dailyLimitSub">Sei ingiocabile… Per oggi i tuoi match sono finiti 😅 Invita amici e ottieni più match.</div>
+      <button class="btn-primary" onclick="closePopup('popupDailyLimit');goToPlus();">✨ Sblocca più match</button>
+      <button class="btn-ghost" onclick="closePopup('popupDailyLimit')">Più tardi</button>
     </div>
   </div>
 
@@ -878,12 +920,23 @@ body::before {
     </div>
   </div>
 
+  <!-- POPUP ELIMINA ACCOUNT -->
+  <div class="popup-bg" id="popupDeleteAccount">
+    <div class="popup-card">
+      <div class="popup-emoji">🗑️</div>
+      <div class="popup-title">Eliminare l'account?</div>
+      <div class="popup-sub">Questa azione è <strong>definitiva</strong>: verranno cancellati il tuo profilo, i match, i messaggi, le foto e l'account. Non si può annullare.</div>
+      <button class="btn-primary" id="btnConfirmDelete" onclick="deleteMyAccount()" style="background:var(--accent);">Sì, elimina definitivamente</button>
+      <button class="btn-ghost" onclick="closePopup('popupDeleteAccount')">Annulla</button>
+    </div>
+  </div>
+
   <!-- POPUP SCADUTO -->
   <div class="popup-bg" id="popupExpired">
     <div class="popup-card">
       <div class="popup-emoji">⏰</div>
       <div class="popup-title">Tempo scaduto!</div>
-      <div class="popup-sub">Il match è scaduto. Torna online per trovarne un altro!</div>
+      <div class="popup-sub">Per me rimani una persona stupenda ⏳ Riprova, il prossimo è dietro l'angolo.</div>
       <button class="btn-primary" onclick="closePopup('popupExpired');goHome()">Riprova</button>
     </div>
   </div>
@@ -936,7 +989,7 @@ body::before {
   <!-- ===== REGISTER ===== -->
   <div class="screen" id="s-register">
     <div class="topbar">
-      <button onclick="goTo('login')" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
+      <button onclick="goTo('auth')" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
       <div class="logo">Live<span>Match</span></div>
       <div style="width:24px"></div>
     </div>
@@ -958,15 +1011,14 @@ body::before {
         <label>NOME</label>
         <input type="text" id="regName" placeholder="Il tuo nome"/>
       </div>
-      <div class="row2">
-        <div class="field">
-          <label>ETÀ</label>
-          <input type="number" id="regAge" placeholder="25" min="18" max="99"/>
-        </div>
-        <div class="field">
-          <label>CITTÀ</label>
-          <input type="text" id="regCity" placeholder="Milano"/>
-        </div>
+      <div class="field">
+        <label>DATA DI NASCITA</label>
+        <input type="date" id="regBirthdate" onchange="updateRegAgeHint()"/>
+        <div class="char-counter" id="regAgeHint" style="text-align:left"></div>
+      </div>
+      <div class="field">
+        <label>CITTÀ</label>
+        <input type="text" id="regCity" placeholder="Milano"/>
       </div>
       <div class="row2">
         <div class="field">
@@ -1029,6 +1081,10 @@ body::before {
         <label>PASSWORD</label>
         <input type="password" id="regPassword" placeholder="Minimo 6 caratteri"/>
       </div>
+      <div class="field">
+        <label>CODICE INVITO <span style="color:var(--text3)">(facoltativo)</span></label>
+        <input type="text" id="regReferral" maxlength="6" placeholder="Es. 93D5FE" style="text-transform:uppercase"/>
+      </div>
       <button class="btn-primary" id="btnRegister" onclick="doRegister()">Crea account →</button>
     </div>
   </div>
@@ -1055,17 +1111,18 @@ body::before {
         <div class="radar-ring"></div>
         <div class="radar-center">❤️</div>
       </div>
-      <div class="waiting-label">Sei online e<br/>pronto/a a matchare</div>
-      <div class="waiting-sub">Solo persone attive adesso</div>
-      <div class="online-badge"><strong id="onlineCount">…</strong> persone online ora</div>
+      <div class="waiting-label">Pronto/a a conoscere<br/>qualcuno che ti sopporti?</div>
+      <div class="waiting-sub">Solo gente attiva adesso</div>
+      <div class="online-badge"><strong id="onlineCount">…</strong> persone in cerca proprio ora</div>
       <button class="btn-primary" id="btnMatch" onclick="findMatch()" style="margin-top:4px">
-        🔍 Cerca un match live
+        🔍 Cerca una persona fantastica come te
       </button>
       <button class="btn-ghost" onclick="goTo('profile')">Il mio profilo</button>
     </div>
     <div class="bottom-nav">
       <div class="nav-item active" onclick="navTo('waiting')"><div class="icon">🏠</div>Home</div>
       <div class="nav-item" onclick="navTo('chats')"><div class="icon">💬</div>Chat</div>
+      <div class="nav-item" onclick="navTo('plus')"><div class="icon">✨</div>Plus</div>
       <div class="nav-item" onclick="navTo('profile')"><div class="icon">👤</div>Profilo</div>
     </div>
   </div>
@@ -1073,6 +1130,7 @@ body::before {
   <!-- ===== SEARCHING ===== -->
   <div class="screen" id="s-searching">
     <div class="topbar">
+      <button onclick="cancelSearch()" aria-label="Indietro" style="background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;padding:0 4px;">←</button>
       <div class="logo">Live<span>Match</span></div>
       <div class="live-pill"><div class="live-dot"></div>LIVE</div>
     </div>
@@ -1082,7 +1140,7 @@ body::before {
         <div class="radar-center">🔍</div>
       </div>
       <div class="waiting-label">Ricerca in corso…</div>
-      <div class="waiting-sub" id="searchMsg">Cercando tra gli utenti online…</div>
+      <div class="waiting-sub" id="searchMsg">Frugo tra i single della zona…</div>
       <button class="btn-ghost" style="width:200px" onclick="cancelSearch()">← Torna in home</button>
     </div>
   </div>
@@ -1090,11 +1148,12 @@ body::before {
   <!-- ===== MATCH FOUND ===== -->
   <div class="screen" id="s-match">
     <div class="topbar">
+      <button onclick="goHome()" aria-label="Indietro" style="background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;padding:0 4px;">←</button>
       <div class="logo">Live<span>Match</span></div>
       <div class="live-pill"><div class="live-dot"></div>LIVE</div>
     </div>
     <div class="body">
-      <div class="match-alert">🎉 Match trovato! Hai 30 secondi per rispondere</div>
+      <div class="match-alert" id="matchTopAlert">🎉 Impossibile! c'è qualcuno/a che ti cerca, hai 30 secondi 😄</div>
       <div class="profile-card">
         <div class="timer-wrap">
           <svg width="60" height="60" viewBox="0 0 60 60">
@@ -1120,11 +1179,22 @@ body::before {
           <audio id="matchAudioPlayer" controls preload="none"></audio>
         </div>
       </div>
-      <div class="actions-row">
-        <button class="btn-reject" onclick="rejectMatch()">✕ Rifiuta</button>
-        <button class="btn-accept" onclick="acceptMatch()">✓ Accetta</button>
+      <!-- Azioni normali -->
+      <div id="matchActionsNormal">
+        <div class="actions-row">
+          <button class="btn-reject" onclick="rejectMatch()">✕ Rifiuta</button>
+          <button class="btn-accept" id="matchAcceptBtn" onclick="acceptMatch()">💘 Richiedi match</button>
+        </div>
+        <button class="btn-photo" onclick="requestPhoto()" style="margin-top:10px">📸 Chiedi una foto dal vivo</button>
       </div>
-      <button class="btn-photo" onclick="requestPhoto()">📸 Chiedi una foto dal vivo</button>
+      <!-- Azioni quando è una richiesta di foto in arrivo (Bug 2) -->
+      <div id="matchActionsPhoto" style="display:none">
+        <div class="match-alert" style="margin-bottom:10px">📸 Ti ha chiesto una foto dal vivo</div>
+        <div class="actions-row">
+          <button class="btn-reject" onclick="rejectPhotoRequest()">✕ Rifiuta</button>
+          <button class="btn-accept" onclick="acceptIncomingPhoto()">📸 Accetta e scatta</button>
+        </div>
+      </div>
       <div style="font-size:11px;color:var(--text3);text-align:center;">Il match scade automaticamente in 30s</div>
       <button class="report-btn" onclick="reportUser()">🚩 Segnala questo utente</button>
     </div>
@@ -1253,7 +1323,7 @@ body::before {
         <span style="font-size:24px">💘</span>
         <div class="accepted-av" id="acceptedAvThem" style="background:linear-gradient(135deg,#f77f8a,#e64b6b)"></div>
       </div>
-      <div class="accepted-sub" id="acceptedSub">Tu e qualcuno vi siete piaciuti!</div>
+      <div class="accepted-sub" id="acceptedSub">Vi siete piaciuti! Ora fai la giocata 😄</div>
       <button class="btn-primary" id="btnGoChat" onclick="enterChat()" ontouchend="event.preventDefault();enterChat()">💬 Inizia a chattare</button>
     </div>
   </div>
@@ -1363,6 +1433,18 @@ body::before {
         </div>
       </div>
 
+      <div class="section-label">Notifiche</div>
+      <div class="field">
+        <label>PERSONE LIVE</label>
+        <select id="editLiveNotif">
+          <option value="0">Mai</option>
+          <option value="1">1 al giorno</option>
+          <option value="2">Fino a 2 al giorno</option>
+          <option value="3">Fino a 3 al giorno</option>
+        </select>
+        <div class="char-counter" style="text-align:left">Ti avvisiamo quando ci sono tante persone online adesso. Mai di notte.</div>
+      </div>
+
       <div id="editError" class="error-msg" style="display:none"></div>
       <div id="editSuccess" class="success-msg" style="display:none"></div>
       <button class="btn-primary" id="btnSaveEdit" onclick="saveEditProfile()">💾 Salva modifiche</button>
@@ -1393,6 +1475,7 @@ body::before {
     <div class="bottom-nav">
       <div class="nav-item" onclick="navTo('waiting')"><div class="icon">🏠</div>Home</div>
       <div class="nav-item active" onclick="navTo('chats')"><div class="icon">💬</div>Chat</div>
+      <div class="nav-item" onclick="navTo('plus')"><div class="icon">✨</div>Plus</div>
       <div class="nav-item" onclick="navTo('profile')"><div class="icon">👤</div>Profilo</div>
     </div>
   </div>
@@ -1436,12 +1519,90 @@ body::before {
           <div class="toggle-slider"></div>
         </label>
       </div>
+
+      <!-- TOGGLE TEMA SCURO -->
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span>🌙 Tema scuro</span>
+          <small>Passa ai toni scuri</small>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggleTheme" onchange="setDarkTheme(this.checked)"/>
+          <div class="toggle-slider"></div>
+        </label>
+      </div>
+
       <button class="btn-ghost" onclick="doLogout()">Esci dall'account</button>
+      <button class="btn-ghost" onclick="confirmDeleteAccount()" style="border-color:rgba(255,77,109,0.4);color:var(--accent2);">🗑️ Elimina account</button>
+      <div style="text-align:center;margin-top:6px;">
+        <a href="#" onclick="openPrivacy();return false;" style="color:var(--text3);font-size:12px;text-decoration:underline;">Privacy Policy</a>
+      </div>
     </div>
     <div class="bottom-nav">
       <div class="nav-item" onclick="navTo('waiting')"><div class="icon">🏠</div>Home</div>
       <div class="nav-item" onclick="navTo('chats')"><div class="icon">💬</div>Chat</div>
+      <div class="nav-item" onclick="navTo('plus')"><div class="icon">✨</div>Plus</div>
       <div class="nav-item active" onclick="navTo('profile')"><div class="icon">👤</div>Profilo</div>
+    </div>
+  </div>
+
+  <!-- ===== PIÙ MATCH (referral + abbonamento) ===== -->
+  <div class="screen" id="s-plus">
+    <div class="topbar" style="border-bottom:0.5px solid var(--border);padding-top:max(12px,env(safe-area-inset-top));">
+      <button onclick="navTo('profile')" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
+      <div style="font-size:14px;font-weight:500;">Più match</div>
+      <div style="width:24px"></div>
+    </div>
+    <div class="body">
+      <!-- Stato piano attuale -->
+      <div style="text-align:center;">
+        <div style="font-family:'DM Serif Display',serif;font-size:24px;line-height:1.2;" id="plusPlanLabel">Piano Gratis</div>
+        <div style="font-size:14px;color:var(--text2);margin-top:2px;" id="plusLimitLabel">5 match al giorno</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px;" id="plusExpiry"></div>
+      </div>
+
+      <!-- Invita amici -->
+      <div class="section-label" style="text-align:center;">Invita amici, sblocca gratis</div>
+      <div class="filter-section" style="gap:14px;">
+        <div style="text-align:center;">
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Il tuo codice invito</div>
+          <div id="plusRefCode" class="plus-code">······</div>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-primary" style="flex:1;" onclick="shareInvite()">📨 Condividi</button>
+          <button class="btn-primary btn-copy" onclick="copyInvite()">Copia</button>
+        </div>
+        <div style="font-size:13px;color:var(--text2);text-align:center;line-height:1.5;">
+          Amici validi <span style="color:var(--text3)">(email verificata + profilo completo)</span><br/>
+          <strong id="plusValidCount" style="color:var(--green);font-size:16px;">0</strong>
+        </div>
+      </div>
+
+      <!-- I livelli -->
+      <div class="section-label">I livelli</div>
+      <div class="filter-section" style="gap:0;">
+        <div class="plus-tier" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:0.5px solid var(--border);">
+          <div><div style="font-weight:600;">10 match / giorno</div><div style="font-size:12px;color:var(--text3);margin-top:2px;">Invita 3 amici · oppure €1,99/mese</div></div>
+          <div id="plusTier1Status" style="font-size:13px;color:var(--text2);white-space:nowrap;">0/3 amici</div>
+        </div>
+        <div class="plus-tier" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:0.5px solid var(--border);">
+          <div><div style="font-weight:600;">20 match / giorno</div><div style="font-size:12px;color:var(--text3);margin-top:2px;">Invita 6 amici · oppure €4,99/mese</div></div>
+          <div id="plusTier2Status" style="font-size:13px;color:var(--text2);white-space:nowrap;">0/6 amici</div>
+        </div>
+        <div class="plus-tier" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;">
+          <div><div style="font-weight:600;">Match illimitati</div><div style="font-size:12px;color:var(--text3);margin-top:2px;">Invita 10 amici · oppure €9,99/mese</div></div>
+          <div id="plusTier3Status" style="font-size:13px;color:var(--text2);white-space:nowrap;">0/10 amici</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);text-align:center;line-height:1.5;">
+        I pagamenti in-app arriveranno presto. Per ora sblocca i livelli invitando amici.
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item" onclick="navTo('waiting')"><div class="icon">🏠</div>Home</div>
+      <div class="nav-item" onclick="navTo('chats')"><div class="icon">💬</div>Chat</div>
+      <div class="nav-item active" onclick="navTo('plus')"><div class="icon">✨</div>Plus</div>
+      <div class="nav-item" onclick="navTo('profile')"><div class="icon">👤</div>Profilo</div>
     </div>
   </div>
 
@@ -1507,6 +1668,8 @@ let currentUser = null;
 let currentProfile = null;
 let currentMatch = null;
 let matchedProfile = null;
+let sessionSeenIds = new Set(); // persone già proposte in questa sessione (Bug 1)
+let incomingPhotoReq = false;   // true quando vedo il profilo di chi mi ha chiesto una foto (Bug 2)
 let matchTimer = null;
 let photoTimer = null;
 let photoSecs = 60;
@@ -1608,9 +1771,66 @@ async function resendVerification() {
 }
 
 // ============================================================
-// 15b. LIMITE MATCH GIORNALIERO
+// 15b. LIMITE MATCH GIORNALIERO (dinamico in base al piano)
 // ============================================================
-const DAILY_LIMIT = 10;
+// Free = 5/giorno. I referral (o, in futuro, l'abbonamento) alzano il limite.
+let planState = null; // { daily_limit, plan_tier, plan_expires_at, referral_code, valid_referrals }
+function currentDailyLimit() { return (planState && planState.daily_limit) || 5; }
+function isUnlimited() { return currentDailyLimit() >= 999999; }
+
+async function loadPlan() {
+  try {
+    const { data, error } = await sb.rpc('refresh_my_plan');
+    if (!error && data) {
+      planState = data;
+      if (currentProfile) {
+        currentProfile.plan_tier = data.plan_tier;
+        currentProfile.daily_limit = data.daily_limit;
+        currentProfile.referral_code = data.referral_code;
+      }
+    }
+  } catch (e) { console.error('[LiveMatch] loadPlan', e); }
+}
+
+// ---- Schermata "Più match" + inviti ----
+const INVITE_BASE_URL = 'https://livematch-virid.vercel.app';
+function inviteMessage() {
+  const code = (planState && planState.referral_code) || (currentProfile && currentProfile.referral_code) || '';
+  return `Unisciti a me su LiveMatch 💘 Usa il mio codice invito ${code} alla registrazione: sblocchiamo più match! ${INVITE_BASE_URL}`;
+}
+function goToPlus() { navTo('plus'); }
+function loadPlusScreen() {
+  const tier = (planState && planState.plan_tier) || 0;
+  const lim = currentDailyLimit();
+  const valid = (planState && planState.valid_referrals) || 0;
+  const names = ['Gratis', 'Livello 1', 'Livello 2', 'Illimitato'];
+  const set = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+  set('plusPlanLabel', 'Piano ' + (names[tier] || 'Gratis'));
+  set('plusLimitLabel', isUnlimited() ? 'Match illimitati' : (lim + ' match al giorno'));
+  const exp = planState && planState.plan_expires_at;
+  const expEl = document.getElementById('plusExpiry');
+  if (expEl) expEl.textContent = (tier > 0 && exp) ? ('Attivo fino al ' + new Date(exp).toLocaleDateString('it-IT')) : '';
+  set('plusRefCode', (planState && planState.referral_code) || '······');
+  set('plusValidCount', valid);
+  const reqs = [3, 6, 10];
+  for (let i = 0; i < 3; i++) {
+    const el = document.getElementById('plusTier' + (i + 1) + 'Status');
+    if (!el) continue;
+    if (valid >= reqs[i]) { el.textContent = '✅ Sbloccato'; el.style.color = 'var(--green)'; }
+    else { el.textContent = valid + '/' + reqs[i] + ' amici'; el.style.color = 'var(--text2)'; }
+  }
+}
+async function shareInvite() {
+  const text = inviteMessage();
+  try {
+    if (navigator.share) { await navigator.share({ title: 'LiveMatch', text }); return; }
+  } catch (e) { return; } // condivisione annullata dall'utente
+  copyInvite();
+}
+async function copyInvite() {
+  try { await navigator.clipboard.writeText(inviteMessage()); alert('Invito copiato! 📋 Incollalo dove vuoi.'); }
+  catch (e) { alert(inviteMessage()); }
+}
 
 async function checkDailyLimit() {
   if (!currentProfile) return true;
@@ -1623,10 +1843,14 @@ async function checkDailyLimit() {
     currentProfile.last_match_date = today;
   }
 
+  const LIM = currentDailyLimit();
+  const used = currentProfile.daily_matches || 0;
+  const remaining = LIM - used;
   const badge = document.getElementById('limitBadge');
-  const remaining = DAILY_LIMIT - (currentProfile.daily_matches || 0);
   if (badge) {
-    if (remaining <= 3) {
+    if (isUnlimited()) {
+      badge.style.display = 'none';
+    } else if (remaining <= 3) {
       badge.style.display = 'block';
       badge.textContent = remaining > 0 ? remaining + ' match rimanenti oggi' : 'Limite giornaliero raggiunto';
     } else {
@@ -1634,7 +1858,9 @@ async function checkDailyLimit() {
     }
   }
 
-  if ((currentProfile.daily_matches || 0) >= DAILY_LIMIT) {
+  if (!isUnlimited() && used >= LIM) {
+    const sub = document.getElementById('dailyLimitSub');
+    if (sub) sub.textContent = `Sei ingiocabile… Per oggi i tuoi ${LIM} match sono finiti 😅 Invita amici e ottieni più match.`;
     document.getElementById('popupDailyLimit').classList.add('show');
     return false;
   }
@@ -1750,7 +1976,7 @@ function showToast({ profile, type, matchData }) {
   const actionsHtml = type === 'photo'
     ? `<button class="toast-btn view" onclick="toastViewProfile()">Vedi profilo</button>
        <button class="toast-btn accept" onclick="toastSendPhoto()">📸 Scatta foto</button>
-       <button class="toast-btn reject" onclick="dismissToast()">Ignora</button>`
+       <button class="toast-btn reject" onclick="rejectPhotoRequest()">✕ Rifiuta</button>`
     : `<button class="toast-btn view" onclick="toastViewProfile()">Vedi profilo</button>
        <button class="toast-btn accept" onclick="toastAccept()">✓ Accetta</button>
        <button class="toast-btn reject" onclick="toastReject()">✕ Rifiuta</button>`;
@@ -1810,10 +2036,12 @@ function dismissToast() {
 
 function toastViewProfile() {
   if (!toastMatchData) return;
-  // Mostra il profilo nella schermata match senza avviare il timer
-  const { profile, matchData } = toastMatchData;
+  // Mostra il profilo nella schermata match
+  const { profile, matchData, type } = toastMatchData;
   currentMatch = matchData;
   matchedProfile = profile;
+  // Se è una richiesta di foto, il profilo mostra solo "Accetta con foto" / "Rifiuta"
+  incomingPhotoReq = (type === 'photo');
   renderMatchScreen(profile);
   goTo('match');
   startMatchTimer();
@@ -1860,6 +2088,30 @@ function toastSendPhoto() {
   startPhotoTimer();
 }
 
+// B accetta la richiesta foto dalla schermata profilo → va a scattare
+function acceptIncomingPhoto() {
+  stopMatchTimer();
+  incomingPhotoReq = false;
+  if (!matchedProfile) { goTo('waiting'); return; }
+  document.getElementById('photoTitle').textContent = matchedProfile.name + ' ti ha chiesto una foto dal vivo! Scatta anche tu entro 60 secondi.';
+  goTo('photo');
+  startPhotoTimer();
+}
+
+// B rifiuta la richiesta foto (dal toast o dal profilo) → il richiedente
+// riceve il popup "Match rifiutato" (via Realtime UPDATE su match_requests)
+function rejectPhotoRequest() {
+  stopMatchTimer();
+  const m = currentMatch || (toastMatchData && toastMatchData.matchData);
+  dismissToast();
+  incomingPhotoReq = false;
+  if (m && m.id) {
+    sb.from('match_requests').update({ status: 'rejected' }).eq('id', m.id).catch(() => {});
+  }
+  currentMatch = null; matchedProfile = null;
+  navTo('waiting');
+}
+
 // Quando B accetta dal toast della foto (va direttamente a scattare)
 
 
@@ -1886,6 +2138,9 @@ function openEditProfile() {
   document.getElementById('editWhyDate').value = p.why_date_me || '';
   updateCharCount('editWhyDate', 'editWhyCount');
   document.getElementById('editAudioQuestion').value = p.audio_question || '';
+  // Notifiche "persone live": 0 = mai (off), 1..3 = max al giorno
+  const liveSel = document.getElementById('editLiveNotif');
+  if (liveSel) liveSel.value = String(p.live_notif_enabled ? (p.live_notif_freq || 1) : 0);
 
   // Precompila audio esistente
   resetRecUI('edit');
@@ -1931,10 +2186,13 @@ function triggerPhotoEdit(slot) {
 function handleEditPhoto(e) {
   const file = e.target.files[0];
   if (!file) return;
-  editPhotos[editPhotoSlot] = file;
-  const url = URL.createObjectURL(file);
-  editPhotoUrls[editPhotoSlot] = url;
-  renderEditSlot(editPhotoSlot, url);
+  const slot = editPhotoSlot;
+  checkImageThen(file, () => {
+    editPhotos[slot] = file;
+    const url = URL.createObjectURL(file);
+    editPhotoUrls[slot] = url;
+    renderEditSlot(slot, url);
+  });
 }
 
 function renderEditSlot(i, url) {
@@ -1983,14 +2241,21 @@ async function saveEditProfile() {
     errEl.textContent = 'Nome, età e città sono obbligatori.';
     errEl.style.display = 'block'; return;
   }
+  if (age < 18) {
+    errEl.textContent = 'Devi avere almeno 18 anni.';
+    errEl.style.display = 'block'; return;
+  }
 
   btn.disabled = true; btn.textContent = 'Salvataggio…';
 
   const minAge = parseInt(document.getElementById('editMinAge')?.value || 18);
   const maxAge = parseInt(document.getElementById('editMaxAge')?.value || 99);
   const maxDist = parseInt(document.getElementById('editMaxDist')?.value || 50);
+  // Notifiche "persone live": 0 = mai (disattivata), 1..3 = max al giorno
+  const liveVal = parseInt(document.getElementById('editLiveNotif')?.value || '0', 10);
   const updates = { name, age, city, gender, orientation, looking_for, bio, min_age: minAge, max_age: maxAge, max_distance: maxDist,
-                    why_date_me: whyDate || null, audio_question: audioQuestion || null };
+                    why_date_me: whyDate || null, audio_question: audioQuestion || null,
+                    live_notif_enabled: liveVal > 0, live_notif_freq: Math.max(1, liveVal) };
 
   // Audio: se ne è stato registrato uno nuovo, caricalo; se è stato rimosso
   // (redo senza nuova registrazione e nessun audio esistente) → null; altrimenti invariato.
@@ -2044,6 +2309,10 @@ function navTo(screen) {
     const onclick = item.getAttribute('onclick') || '';
     if (onclick.includes("'" + screen + "'")) item.classList.add('active');
   });
+  if (screen === 'plus') {
+    loadPlusScreen();                 // mostra subito lo stato noto
+    loadPlan().then(loadPlusScreen);  // poi aggiorna dal server
+  }
   if (screen === 'chats') {
     loadChatList();
     // ✅ FIX: event delegation — un solo listener sul container, funziona su iOS
@@ -2291,12 +2560,20 @@ async function init() {
 // NAVIGATION
 // ============================================================
 function goTo(screen) {
+  const el = document.getElementById('s-' + screen);
+  if (!el) { console.error('[LiveMatch] goTo: schermata inesistente:', screen); return; }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('s-' + screen).classList.add('active');
+  el.classList.add('active');
 }
 
 function closePopup(id) {
   document.getElementById(id).classList.remove('show');
+}
+
+// Apre la privacy policy nel browser di sistema
+const PRIVACY_URL = 'https://livematch-virid.vercel.app/privacy.html';
+function openPrivacy() {
+  try { window.open(PRIVACY_URL, '_blank'); } catch (e) { location.href = PRIVACY_URL; }
 }
 
 function goHome() {
@@ -2308,6 +2585,7 @@ function goHome() {
   if (window._photoReviewTimer) { clearInterval(window._photoReviewTimer); window._photoReviewTimer = null; }
   currentMatch = null;
   matchedProfile = null;
+  incomingPhotoReq = false;
   navTo('waiting');
   subscribeToMatches();
 }
@@ -2336,9 +2614,32 @@ async function doLogin() {
   goTo('waiting');
 }
 
+// Calcola l'età da una data 'YYYY-MM-DD'
+function computeAge(dobStr) {
+  if (!dobStr) return null;
+  const dob = new Date(dobStr);
+  if (isNaN(dob.getTime())) return null;
+  const now = new Date();
+  let a = now.getFullYear() - dob.getFullYear();
+  const m = now.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) a--;
+  return a;
+}
+
+// Mostra l'età calcolata / avviso sotto la data di nascita in registrazione
+function updateRegAgeHint() {
+  const hint = document.getElementById('regAgeHint');
+  if (!hint) return;
+  const a = computeAge(document.getElementById('regBirthdate').value);
+  if (a == null) { hint.textContent = ''; hint.style.color = ''; return; }
+  if (a < 18) { hint.textContent = '⚠️ Devi avere almeno 18 anni'; hint.style.color = 'var(--accent)'; }
+  else { hint.textContent = a + ' anni'; hint.style.color = 'var(--text3)'; }
+}
+
 async function doRegister() {
   const name = document.getElementById('regName').value.trim();
-  const age = parseInt(document.getElementById('regAge').value);
+  const birthdate = document.getElementById('regBirthdate').value; // 'YYYY-MM-DD'
+  const age = computeAge(birthdate);
   const city = document.getElementById('regCity').value.trim();
   const gender = document.getElementById('regGender').value;
   const orientation = document.getElementById('regOrientation').value;
@@ -2352,10 +2653,20 @@ async function doRegister() {
   const err = document.getElementById('regError');
   err.style.display = 'none';
 
-  if (!name || !age || !city || !gender || !orientation || !email || !pwd) {
-    err.textContent = 'Compila tutti i campi obbligatori.'; err.style.display = 'block'; return;
+  const missing = [];
+  if (!name) missing.push('Nome');
+  if (!birthdate) missing.push('Data di nascita');
+  if (!city) missing.push('Città');
+  if (!gender) missing.push('Genere');
+  if (!orientation) missing.push('Orientamento');
+  if (!email) missing.push('Email');
+  if (!pwd) missing.push('Password');
+  if (missing.length) {
+    err.textContent = 'Compila: ' + missing.join(', ') + '.'; err.style.display = 'block'; return;
   }
-  if (age < 18) { err.textContent = 'Devi avere almeno 18 anni.'; err.style.display = 'block'; return; }
+  if (age == null || age < 18) {
+    err.textContent = '🔞 Devi avere almeno 18 anni per usare LiveMatch.'; err.style.display = 'block'; return;
+  }
 
   btn.disabled = true; btn.textContent = 'Creazione…';
 
@@ -2378,14 +2689,21 @@ async function doRegister() {
     await sb.from('profiles').update({ avatar_url: urlData.publicUrl }).eq('id', currentUser.id);
   }
 
-  // Salva risposta testuale + audio (tutti facoltativi)
+  // Salva data di nascita (age gate) + risposta testuale + audio
   const extraUpdates = {};
+  if (birthdate) extraUpdates.birthdate = birthdate;
   if (whyDate) extraUpdates.why_date_me = whyDate;
   if (audioQuestion) extraUpdates.audio_question = audioQuestion;
   const audioUrl = await uploadAudio('reg');
   if (audioUrl) extraUpdates.audio_url = audioUrl;
   if (Object.keys(extraUpdates).length) {
     await sb.from('profiles').update(extraUpdates).eq('id', currentUser.id);
+  }
+
+  // Codice invito (facoltativo): collega l'invitante
+  const refCode = (document.getElementById('regReferral')?.value || '').trim();
+  if (refCode) {
+    try { await sb.rpc('set_referrer', { p_code: refCode }); } catch (e) { console.error('set_referrer', e); }
   }
 
   await loadProfile();
@@ -2400,10 +2718,57 @@ async function doLogout() {
   if (window._onlinePoller) { clearInterval(window._onlinePoller); window._onlinePoller = null; }
   if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
   document.removeEventListener('visibilitychange', handleVisibility);
+  // Rimuovi il token push di questo dispositivo (mentre siamo ancora autenticati)
+  if (window._pushToken && currentProfile) {
+    try { await sb.from('push_tokens').delete().eq('user_id', currentProfile.id).eq('token', window._pushToken); } catch(e) {}
+  }
   await setOffline();
   await sb.auth.signOut();
   currentUser = null; currentProfile = null; currentAccessToken = null;
   goTo('auth');
+}
+
+// ============================================================
+// 5b. CANCELLAZIONE ACCOUNT (richiesta App Store, linea 5.1.1v)
+// ============================================================
+function confirmDeleteAccount() {
+  document.getElementById('popupDeleteAccount').classList.add('show');
+}
+
+async function deleteMyAccount() {
+  const btn = document.getElementById('btnConfirmDelete');
+  if (btn) { btn.disabled = true; btn.textContent = 'Eliminazione…'; }
+  try {
+    if (currentUser) {
+      // 1) Rimuovi i propri file (foto profilo + audio) nel bucket avatars
+      try {
+        const { data: files } = await sb.storage.from('avatars').list(currentUser.id);
+        if (files && files.length) {
+          await sb.storage.from('avatars').remove(files.map(f => currentUser.id + '/' + f.name));
+        }
+      } catch (e) { console.warn('[Delete] avatar cleanup:', e); }
+
+      // 2) Cancella account + dati lato server (funzione security definer)
+      const { error } = await sb.rpc('delete_my_account');
+      if (error) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Sì, elimina definitivamente'; }
+        alert('Errore durante l\'eliminazione: ' + error.message);
+        return;
+      }
+    }
+    // 3) Pulizia locale + logout
+    if (window._heartbeat) { clearInterval(window._heartbeat); window._heartbeat = null; }
+    if (window._onlinePoller) { clearInterval(window._onlinePoller); window._onlinePoller = null; }
+    if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
+    try { await sb.auth.signOut(); } catch (e) {}
+    try { localStorage.clear(); } catch (e) {}
+    currentUser = null; currentProfile = null; currentAccessToken = null; currentMatch = null; matchedProfile = null;
+    closePopup('popupDeleteAccount');
+    goTo('auth');
+    alert('Account eliminato. Ci dispiace vederti andare via.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Sì, elimina definitivamente'; }
+  }
 }
 
 // ============================================================
@@ -2419,6 +2784,7 @@ async function loadProfile() {
     await new Promise(r => setTimeout(r, 600));
   }
   currentProfile = data;
+  await loadPlan();
   if (data) renderProfileScreen(data);
   await loadOnlineCount();
 }
@@ -2433,9 +2799,20 @@ function loadRematchPref() {
   if (toggle) toggle.checked = val === '1';
 }
 
+// ---- Tema chiaro/scuro ----
+function setDarkTheme(on) {
+  document.documentElement.classList.toggle('theme-dark', !!on);
+  try { localStorage.setItem('livematch_theme', on ? 'dark' : 'light'); } catch (e) {}
+}
+function loadThemeToggle() {
+  const t = document.getElementById('toggleTheme');
+  if (t) t.checked = document.documentElement.classList.contains('theme-dark');
+}
+
 function renderProfileScreen(p) {
-  // Carica preferenza rematch
+  // Carica preferenza rematch + stato tema
   loadRematchPref();
+  loadThemeToggle();
   const av = document.getElementById('profileBigAv');
   if (p.avatar_url) {
     av.innerHTML = `<img src="${safeUrl(p.avatar_url)}" alt="${escapeHtml(p.name)}"/>`;
@@ -2478,9 +2855,70 @@ function renderProfileScreen(p) {
 function previewAvatar(e) {
   const file = e.target.files[0];
   if (!file) return;
-  avatarFileToUpload = file;
-  const url = URL.createObjectURL(file);
-  document.getElementById('avatarPreview').innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`;
+  checkImageThen(file, () => {
+    avatarFileToUpload = file;
+    const url = URL.createObjectURL(file);
+    document.getElementById('avatarPreview').innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`;
+  });
+}
+
+// ============================================================
+// 6a. MODERAZIONE FOTO — controllo LATO SERVER (Sightengine via Edge Function)
+// ============================================================
+// Affidabile e non aggirabile (gira sul server). FAIL-CLOSED: se la verifica
+// non riesce, la foto NON viene caricata.
+
+// Ridimensiona l'immagine (max 1024px, JPEG) prima di mandarla: payload piccolo
+// e più che sufficiente per il riconoscimento.
+function _imageToModerationBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const maxDim = 1024;
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          const s = maxDim / Math.max(w, h);
+          w = Math.round(w * s); h = Math.round(h * s);
+        }
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = c.toDataURL('image/jpeg', 0.8);
+        try { URL.revokeObjectURL(img.src); } catch (e) {}
+        resolve(dataUrl.split(',')[1]);
+      } catch (e) { reject(e); }
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(blob);
+  });
+}
+
+// Verdetto: 'safe' | 'unsafe' | 'error'
+async function moderateImage(blob) {
+  try {
+    const base64 = await _imageToModerationBase64(blob);
+    const { data, error } = await sb.functions.invoke('moderate-image', {
+      body: { image: base64, contentType: 'image/jpeg' }
+    });
+    if (error) { console.warn('[moderate] error:', error); return 'error'; }
+    if (data && data.safe === true) return 'safe';
+    if (data && data.error) return 'error';
+    return 'unsafe';
+  } catch (e) { console.warn('[moderate] exception:', e); return 'error'; }
+}
+
+async function isImageSafe(blob) { return (await moderateImage(blob)) === 'safe'; }
+
+// Esegue onOk solo se l'immagine è ok; altrimenti avvisa con il messaggio giusto.
+async function checkImageThen(blob, onOk) {
+  const v = await moderateImage(blob);
+  if (v === 'safe') { onOk(); return; }
+  if (v === 'unsafe') {
+    alert('Questa immagine sembra contenere contenuti espliciti e non può essere caricata. Le foto devono rispettare le linee guida della community.');
+  } else {
+    alert('Non è stato possibile verificare l\'immagine (connessione?). Riprova tra poco.');
+  }
 }
 
 // ============================================================
@@ -2597,8 +3035,52 @@ function resetRecUI(ctx) {
 // ============================================================
 // 7. ONLINE — Presenza, heartbeat, contatore
 // ============================================================
+// ============================================================
+// 7b. PUSH NOTIFICATIONS (solo app nativa iOS)
+// ============================================================
+let _pushSetup = false;
+async function setupPushNotifications() {
+  const Cap = window.Capacitor;
+  // Solo nell'app nativa (in Safari/web il plugin non esiste)
+  if (!Cap || !Cap.isNativePlatform || !Cap.isNativePlatform()) return;
+  const Push = Cap.Plugins && Cap.Plugins.PushNotifications;
+  if (!Push) return;
+  try {
+    if (!_pushSetup) {
+      _pushSetup = true;
+      // Token ottenuto → salvalo su Supabase
+      Push.addListener('registration', async function(token) {
+        const t = token && token.value;
+        if (!t) return;
+        window._pushToken = t;
+        if (currentProfile) {
+          await sb.from('push_tokens').upsert(
+            { user_id: currentProfile.id, token: t, platform: 'ios', updated_at: new Date().toISOString() },
+            { onConflict: 'user_id,token' }
+          );
+          console.log('[Push] token registrato');
+        }
+      });
+      Push.addListener('registrationError', function(e) { console.warn('[Push] registrationError', e); });
+      // Tap su una notifica → vai in chat
+      Push.addListener('pushNotificationActionPerformed', function(action) {
+        try { navTo('chats'); } catch(e) {}
+      });
+    }
+    let perm = await Push.checkPermissions();
+    if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+      perm = await Push.requestPermissions();
+    }
+    if (perm.receive !== 'granted') { console.log('[Push] permesso non concesso:', perm.receive); return; }
+    await Push.register();
+  } catch (e) { console.warn('[Push] setup error', e); }
+}
+
 async function setupOnlinePresence() {
   if (!currentUser) return;
+
+  // Push notifications (no-op su web)
+  setupPushNotifications();
 
   // Imposta subito last_seen e is_online
   await sb.from('profiles')
@@ -2724,7 +3206,7 @@ async function findMatch() {
 
   goTo('searching');
 
-  const msgs = ['Cercando utenti online…','Scansione in corso…','Trovando qualcuno compatibile…','Quasi lì…'];
+  const msgs = ['Frugo tra i single della zona…','Cerco qualcuno alla tua altezza…','Incrocio le dita per te…','Ci siamo quasi…'];
   let i = 0;
   const el = document.getElementById('searchMsg');
   const interval = setInterval(() => { el.textContent = msgs[i % msgs.length]; i++; }, 900);
@@ -2787,6 +3269,10 @@ async function findMatch() {
   const compatible = candidates.filter(c => {
     if (!isCompatible(currentProfile, c)) return false;
     if (seenIds.has(c.id)) return false;
+    // ✅ Dedup di SESSIONE: una persona già proposta in questa sessione non
+    // ricompare, anche con la spunta "rivedi persone" attiva. Si azzera
+    // chiudendo e riaprendo l'app (il Set è in memoria, resettato al reload).
+    if (sessionSeenIds.has(c.id)) return false;
     if (blockedIds.has(c.id)) return false;
     if (blockedByIds.has(c.id)) return false;
     // Filtro età
@@ -2812,8 +3298,10 @@ async function findMatch() {
 
   // Scegli uno random
   const partner = compatible[Math.floor(Math.random() * compatible.length)];
+  sessionSeenIds.add(partner.id); // non riproporlo in questa sessione
   matchedProfile = partner;
   currentMatch = null; // nessun match nel DB ancora
+  incomingPhotoReq = false; // match normale → pulsanti normali
 
   // Mostra profilo di B ad A con timer 30s per decidere
   renderMatchScreen(partner);
@@ -2882,6 +3370,24 @@ function renderMatchScreen(p) {
       audioPlayer.removeAttribute('src');
       audioWrap.style.display = 'none';
     }
+  }
+
+  // Pulsanti: normali oppure modalità "richiesta foto in arrivo" (Bug 2)
+  const actNormal = document.getElementById('matchActionsNormal');
+  const actPhoto = document.getElementById('matchActionsPhoto');
+  if (actNormal && actPhoto) {
+    actNormal.style.display = incomingPhotoReq ? 'none' : '';
+    actPhoto.style.display = incomingPhotoReq ? '' : 'none';
+  }
+  const topAlert = document.getElementById('matchTopAlert');
+  if (topAlert) topAlert.style.display = incomingPhotoReq ? 'none' : '';
+
+  // Etichetta del pulsante: chi RICEVE una richiesta vede "Accetta",
+  // chi INIZIA (cerca e trova) vede "Richiedi match" (poi attende la conferma).
+  const acceptBtn = document.getElementById('matchAcceptBtn');
+  if (acceptBtn) {
+    const amRecipient = !!(currentMatch && currentProfile && currentMatch.to_user === currentProfile.id);
+    acceptBtn.textContent = amRecipient ? '✓ Accetta' : '💘 Richiedi match';
   }
 }
 
@@ -3229,7 +3735,7 @@ function showAcceptedScreen() {
       themAv.textContent = matchedProfile.name[0].toUpperCase();
     }
     document.getElementById('acceptedSub').textContent =
-      'Tu e ' + matchedProfile.name + ' vi siete piaciuti!';
+      'Tu e ' + matchedProfile.name + ' vi siete piaciuti! Ora fai la giocata 😄';
   }
   // Ri-trigghera animazioni
   document.querySelectorAll('.acc-ring').forEach(function(r) {
@@ -3341,20 +3847,21 @@ function stopPhotoTimer() {
 function handlePhotoCapture(e) {
   const file = e.target.files[0];
   if (!file) return;
-  photoCapturedFile = file;
-
-  // Usa FileReader per compatibilità iOS invece di createObjectURL
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    document.getElementById('camDefault').style.display = 'none';
-    const preview = document.getElementById('photoPreview');
-    preview.src = ev.target.result;
-    preview.style.display = 'block';
-    document.getElementById('cameraFrame').classList.add('captured');
-    const btn = document.getElementById('btnSendPhoto');
-    if (btn) { btn.style.display = 'block'; btn.disabled = false; btn.textContent = 'Invia foto e vai alla chat →'; }
-  };
-  reader.readAsDataURL(file);
+  checkImageThen(file, () => {
+    photoCapturedFile = file;
+    // Usa FileReader per compatibilità iOS invece di createObjectURL
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      document.getElementById('camDefault').style.display = 'none';
+      const preview = document.getElementById('photoPreview');
+      preview.src = ev.target.result;
+      preview.style.display = 'block';
+      document.getElementById('cameraFrame').classList.add('captured');
+      const btn = document.getElementById('btnSendPhoto');
+      if (btn) { btn.style.display = 'block'; btn.disabled = false; btn.textContent = 'Invia foto e vai alla chat →'; }
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 async function sendLivePhoto() {
@@ -3831,6 +4338,10 @@ async function sendMessage() {
 async function sendPhotoMessage(e) {
   const file = e.target.files[0];
   if (!file || !currentMatch || !currentProfile) return;
+  if (!(await isImageSafe(file))) {
+    alert('Questa immagine sembra contenere contenuti espliciti e non può essere inviata.');
+    return;
+  }
 
   try {
     const arrayBuffer = await new Promise((resolve, reject) => {
@@ -3982,6 +4493,7 @@ async function subscribeToMatches() {
 
       currentMatch = req;
       matchedProfile = fromProfile;
+      incomingPhotoReq = false;
       renderMatchScreen(fromProfile);
 
       // Mostra toast non invasivo in alto
