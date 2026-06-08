@@ -3378,9 +3378,12 @@ let _pushSetup = false;
 async function savePushToken() {
   if (!window._pushToken || !currentProfile) return;
   try {
+    // onConflict 'token': un device = un solo token. Se lo stesso telefono fa login
+    // con un altro account, il token viene SPOSTATO all'utente corrente (non duplicato),
+    // così un broadcast non manda due notifiche allo stesso dispositivo.
     await sb.from('push_tokens').upsert(
       { user_id: currentProfile.id, token: window._pushToken, platform: 'ios', updated_at: new Date().toISOString() },
-      { onConflict: 'user_id,token' }
+      { onConflict: 'token' }
     );
   } catch (e) { console.warn('[Push] savePushToken', e); }
 }
