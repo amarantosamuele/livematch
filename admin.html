@@ -209,24 +209,40 @@
   }
 
   // ---- Broadcast ----
+  // Helper condiviso: chiama la Edge Function admin-broadcast (broadcast o invio mirato).
+  async function callBroadcast(payload){
+    const { data:{ session } } = await sb.auth.getSession();
+    const res = await fetch(SB_URL+'/functions/v1/admin-broadcast', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+session.access_token },
+      body: JSON.stringify(payload)
+    });
+    const j = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(j.error || ('HTTP '+res.status));
+    return j;
+  }
+
   async function sendBroadcast(){
     const title=$('bcTitle').value.trim(), body=$('bcBody').value.trim();
     if(!title||!body){ setMsg('bcMsg','Inserisci titolo e testo.',false); return; }
     const seg=$('bcSegment').value;
     if(!confirm(`Inviare la notifica a "${seg==='all'?'TUTTI gli utenti':seg}"?`)) return;
     const btn=$('bcBtn'); btn.disabled=true; setMsg('bcMsg','Invio in corso…',true);
-    const { data:{ session } } = await sb.auth.getSession();
     try{
-      const res = await fetch(SB_URL+'/functions/v1/admin-broadcast', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+session.access_token },
-        body: JSON.stringify({ title, body, segment:seg })
-      });
-      const j = await res.json();
-      if(!res.ok){ setMsg('bcMsg', j.error||'Errore', false); }
-      else setMsg('bcMsg', `✓ Inviata: ${j.sent} consegnate / ${j.recipients} destinatari (${j.failed} fallite)`, true);
-    }catch(e){ setMsg('bcMsg', String(e), false); }
+      const j = await callBroadcast({ title, body, segment:seg });
+      setMsg('bcMsg', `✓ Inviata: ${j.sent} consegnate / ${j.recipients} destinatari (${j.failed} fallite)`, true);
+    }catch(e){ setMsg('bcMsg', String(e.message||e), false); }
     btn.disabled=false;
+  }
+
+  // Contatta un utente con una notifica push mirata (es. per chiedere info su una segnalazione).
+  async function contactUser(id, name){
+    const msg = prompt(`Messaggio push da inviare a ${name||'questo utente'}:`, 'Ciao! Lo staff di LiveMatch vorrebbe chiederti alcune informazioni. Rispondi a questa email o scrivici.');
+    if (!msg) return;
+    try{
+      const j = await callBroadcast({ title:'LiveMatch · Staff', body: msg, user_id: id });
+      alert(j.sent>0 ? '✓ Notifica inviata.' : 'Inviata, ma l\'utente non ha notifiche attive / nessun dispositivo.');
+    }catch(e){ alert('Errore: '+(e.message||e)); }
   }
 
   // ---- Moderazione ----
@@ -236,12 +252,19 @@
     if (!data || !data.length){ $('reports').innerHTML='<div class="item">Nessuna segnalazione 🎉</div>'; return; }
     $('reports').innerHTML = data.map(r=>`
       <div class="item">
-        <b>${esc(r.reported_name||'?')}</b> ${r.reported_banned?'<span class="pill">BANNATO</span>':''}
-        <div class="meta">Motivo: ${esc(r.reason||'-')} · segnalato da ${esc(r.reporter_name||'?')} · ${new Date(r.created_at).toLocaleString('it-IT')}</div>
+        <div>🚩 Segnalato: <b>${esc(r.reported_name||'?')}</b> ${r.reported_banned?'<span class="pill">BANNATO</span>':''}</div>
+        <div class="meta">Motivo: ${esc(r.reason||'-')} · ${new Date(r.created_at).toLocaleString('it-IT')}</div>
+        <div class="meta" style="margin-top:6px">Segnalante: <b>${esc(r.reporter_name||'?')}</b> ${r.reporter_email?`· <a href="mailto:${esc(r.reporter_email)}" style="color:#9aa0ad">${esc(r.reporter_email)}</a>`:''}</div>
+        <div class="meta">Segnalato: <b>${esc(r.reported_name||'?')}</b> ${r.reported_email?`· <a href="mailto:${esc(r.reported_email)}" style="color:#9aa0ad">${esc(r.reported_email)}</a>`:''}</div>
+        <div style="margin-top:10px;font-size:11px;color:#6c7180;text-transform:uppercase;letter-spacing:.4px">Contatta (push):</div>
+        <div style="margin-top:5px" class="row">
+          <button class="ghost sm" onclick="contactUser('${r.reporter_id}','${esc(r.reporter_name||'')}')">📨 Segnalante</button>
+          <button class="ghost sm" onclick="contactUser('${r.reported_id}','${esc(r.reported_name||'')}')">📨 Segnalato</button>
+        </div>
         <div style="margin-top:8px" class="row">
           ${r.reported_banned
-            ? `<button class="ok sm" onclick="unban('${r.reported_id}')">Sblocca</button>`
-            : `<button class="danger sm" onclick="ban('${r.reported_id}','${esc(r.reason||'')}')">Banna utente</button>`}
+            ? `<button class="ok sm" onclick="unban('${r.reported_id}')">Sblocca segnalato</button>`
+            : `<button class="danger sm" onclick="ban('${r.reported_id}','${esc(r.reason||'')}')">Banna segnalato</button>`}
         </div>
       </div>`).join('');
   }
@@ -252,8 +275,9 @@
     $('users').innerHTML = data.map(u=>`
       <div class="item">
         <b>${esc(u.name||'?')}</b>, ${u.age||'?'} ${u.banned?'<span class="pill">BANNATO</span>':''} ${u.is_admin?'<span class="pill" style="background:#1d3326;color:#28c76f">ADMIN</span>':''}
-        <div class="meta">${esc(u.email||'')} · ${esc(u.city||'')} · iscritto ${new Date(u.created_at).toLocaleDateString('it-IT')}</div>
+        <div class="meta">${u.email?`<a href="mailto:${esc(u.email)}" style="color:#9aa0ad">${esc(u.email)}</a>`:''} · ${esc(u.city||'')} · iscritto ${new Date(u.created_at).toLocaleDateString('it-IT')}</div>
         <div style="margin-top:8px" class="row">
+          <button class="ghost sm" onclick="contactUser('${u.id}','${esc(u.name||'')}')">📨 Contatta</button>
           ${u.banned
             ? `<button class="ok sm" onclick="unban('${u.id}')">Sblocca</button>`
             : `<button class="danger sm" onclick="ban('${u.id}','')">Banna</button>`}
