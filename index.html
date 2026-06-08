@@ -77,8 +77,9 @@ input, textarea {
   }
   #app {
     width: 100vw !important;
-    min-height: 100vh !important;
-    min-height: 100dvh !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
@@ -97,8 +98,12 @@ body::before {
 }
 #app {
   width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
+  /* Altezza fissata al viewport (non solo min-height): evita che l'app "cresca"
+     col contenuto. Così ogni schermata scorre internamente e la barra input della
+     chat resta sempre in fondo (fix bug "la linea va sotto"). */
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   background: var(--surface);
   border-radius: 0;
   border: none;
@@ -109,8 +114,11 @@ body::before {
   flex-direction: column;
   box-shadow: none;
 }
-.screen { display: none; flex-direction: column; flex: 1; overflow: hidden; }
-.screen.active { display: flex; animation: slideUp 0.28s ease; }
+.screen { display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.screen.active { display: flex; animation: slideUp 0.22s ease; }
+/* Cambio tab del menu = istantaneo (niente animazione → niente lag/rimbalzo percepito).
+   L'animazione resta solo per le transizioni "di flusso" (login→home, match trovato, ecc.) */
+#app.instant .screen.active { animation: none !important; }
 @keyframes slideUp { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
 
 /* ---- TOPBAR ---- */
@@ -299,7 +307,7 @@ body::before {
 #photoInput{display:none}
 
 /* ---- CHAT ---- */
-#s-chat{overflow:hidden;}
+#s-chat{overflow:hidden;min-height:0;}
 .chat-topbar{
   display:flex;align-items:center;gap:10px;
   padding:10px 18px;border-bottom:0.5px solid var(--border);flex-shrink:0;
@@ -315,7 +323,7 @@ body::before {
 .chat-name{font-size:14px;font-weight:500;}
 .chat-status{font-size:11px;color:var(--green);}
 .messages-area{
-  flex:1;overflow-y:auto;padding:14px 18px;
+  flex:1;min-height:0;overflow-y:auto;padding:14px 18px;
   display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth;
 }
 .messages-area::-webkit-scrollbar{width:3px}
@@ -368,6 +376,7 @@ body::before {
   width:38px;height:38px;border-radius:50%;background:var(--accent);border:none;
   display:flex;align-items:center;justify-content:center;cursor:pointer;
   font-size:16px;flex-shrink:0;transition:transform 0.1s;
+  color:#fff; /* freccia "invia" sempre bianca (prima ereditava il colore testo → appariva blu/scura) */
 }
 .send-btn:hover{transform:scale(1.05)}
 .send-btn:active{transform:scale(0.95)}
@@ -376,12 +385,23 @@ body::before {
   background:var(--surface2);border:0.5px solid var(--border2);
   display:flex;align-items:center;justify-content:center;cursor:pointer;
   font-size:16px;flex-shrink:0;
-  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
 }
+.chat-mic-btn{ touch-action:none; -webkit-user-select:none; user-select:none; }
 .chat-mic-btn.recording{
   background:var(--accent);border-color:var(--accent);color:#fff;
-  font-size:13px;font-weight:600;animation:blink 1s infinite;
+  transform:scale(1.35);box-shadow:0 0 0 6px rgba(255,77,109,0.18);
 }
+/* Barra di registrazione vocale (stile WhatsApp) */
+#chatRecBar{ display:none; flex:1; align-items:center; gap:10px; padding:0 4px; font-size:13px; color:var(--text2); }
+.input-row.recording #chatInput,
+.input-row.recording .chat-photo-btn,
+.input-row.recording .send-btn{ display:none; }
+.input-row.recording #chatRecBar{ display:flex; }
+#chatRecBar .rec-dot{ width:10px;height:10px;border-radius:50%;background:var(--accent);animation:blink 1s infinite;flex-shrink:0; }
+#chatRecBar .rec-hint{ margin-left:auto; color:var(--text3); white-space:nowrap; }
+#chatRecBar.cancel{ color:var(--accent); }
+#chatRecBar.cancel .rec-hint{ color:var(--accent); font-weight:600; }
 #chatPhotoInput{display:none;}
 
 /* ---- POPUPS ---- */
@@ -836,6 +856,43 @@ body::before {
 }
 /* Numero del countdown (SVG) segue il colore del tema */
 #tTxt { fill: var(--text); }
+
+/* Mini-toast (es. "Copiato") — non bloccante, sparisce da solo */
+#miniToast{
+  position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(10px);
+  background:var(--text);color:var(--bg);padding:10px 20px;border-radius:22px;
+  font-size:14px;font-weight:600;opacity:0;pointer-events:none;z-index:9999;
+  transition:opacity .2s ease, transform .2s ease;
+}
+#miniToast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* Tutorial di benvenuto (primo avvio) */
+#tutorial{
+  position:fixed; inset:0; z-index:10000; background:var(--bg);
+  display:none; flex-direction:column;
+  padding:32px 24px max(28px, env(safe-area-inset-bottom));
+}
+#tutorial.show{ display:flex; }
+.tut-skip{
+  position:absolute; top:max(16px, env(safe-area-inset-top)); right:20px;
+  background:none; border:none; color:var(--text3); font-size:14px; cursor:pointer; z-index:1;
+}
+.tut-slides{ flex:1; display:flex; align-items:center; justify-content:center; }
+.tut-slide{ display:none; text-align:center; max-width:340px; }
+.tut-slide.active{ display:block; animation:slideUp .28s ease; }
+.tut-icon{ font-size:76px; margin-bottom:20px; }
+.tut-title{ font-family:'DM Serif Display',serif; font-size:27px; line-height:1.2; margin-bottom:12px; }
+.tut-text{ font-size:15px; color:var(--text2); line-height:1.55; }
+.tut-dots{ display:flex; gap:8px; justify-content:center; margin-bottom:18px; }
+.tut-dot{ width:8px; height:8px; border-radius:50%; background:var(--surface3); transition:all .2s; }
+.tut-dot.active{ background:var(--accent); width:22px; border-radius:4px; }
+.tut-next{ width:100%; }
+
+/* Pagina Guida / Come funziona */
+#s-guide .body{ flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:18px; }
+#s-guide .body::-webkit-scrollbar{ width:3px }
+.guide-h{ font-family:'DM Serif Display',serif; font-size:18px; margin-bottom:6px; }
+#s-guide p{ font-size:14px; color:var(--text2); line-height:1.6; }
 </style>
 <script>
   /* Applica il tema salvato PRIMA del render (niente flash). Default: chiaro. */
@@ -1254,11 +1311,16 @@ body::before {
         <span></span><span></span><span></span>
       </div>
     </div>
-    <div class="input-row">
+    <div class="input-row" id="chatInputRow">
       <div class="chat-photo-btn" onclick="document.getElementById('chatPhotoInput').click()">📸</div>
       <input type="file" id="chatPhotoInput" accept="image/*" onchange="sendPhotoMessage(event)"/>
-      <div class="chat-mic-btn" id="chatMicBtn" onclick="toggleChatVoice()" title="Messaggio vocale">🎤</div>
+      <div class="chat-mic-btn" id="chatMicBtn" title="Tieni premuto per registrare">🎤</div>
       <input type="text" id="chatInput" placeholder="Scrivi un messaggio…" onkeydown="if(event.key==='Enter')sendMessage()" oninput="handleChatInput()"/>
+      <div id="chatRecBar">
+        <span class="rec-dot"></span>
+        <span id="chatRecTime">0:00</span>
+        <span class="rec-hint" id="chatRecHint">‹ scorri per annullare</span>
+      </div>
       <button class="send-btn" onclick="sendMessage()">➤</button>
     </div>
   </div>
@@ -1532,6 +1594,7 @@ body::before {
         </label>
       </div>
 
+      <button class="btn-primary" onclick="goTo('guide')" style="background:var(--surface2);border:0.5px solid var(--border2);color:var(--text);">❓ Come funziona</button>
       <button class="btn-ghost" onclick="doLogout()">Esci dall'account</button>
       <button class="btn-ghost" onclick="confirmDeleteAccount()" style="border-color:rgba(255,77,109,0.4);color:var(--accent2);">🗑️ Elimina account</button>
       <div style="text-align:center;margin-top:6px;">
@@ -1549,7 +1612,7 @@ body::before {
   <!-- ===== PIÙ MATCH (referral + abbonamento) ===== -->
   <div class="screen" id="s-plus">
     <div class="topbar" style="border-bottom:0.5px solid var(--border);padding-top:max(12px,env(safe-area-inset-top));">
-      <button onclick="navTo('profile')" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
+      <button onclick="navTo('waiting')" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
       <div style="font-size:14px;font-weight:500;">Più match</div>
       <div style="width:24px"></div>
     </div>
@@ -1606,6 +1669,80 @@ body::before {
     </div>
   </div>
 
+  <!-- ===== GUIDA / COME FUNZIONA ===== -->
+  <div class="screen" id="s-guide">
+    <div class="topbar" style="border-bottom:0.5px solid var(--border);padding-top:max(12px,env(safe-area-inset-top));">
+      <button onclick="navTo('profile')" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
+      <div style="font-size:14px;font-weight:500;">Come funziona</div>
+      <div style="width:24px"></div>
+    </div>
+    <div class="body">
+      <div>
+        <div class="guide-h">⚡ Match dal vivo</div>
+        <p>Tocca <strong>Cerca</strong> per trovare qualcuno online proprio adesso. Quando scatta un match hai <strong>30 secondi</strong> per rispondere, poi si apre la chat.</p>
+      </div>
+      <div>
+        <div class="guide-h">📸 Foto dal vivo</div>
+        <p>È il cuore di LiveMatch: durante un match potete chiedervi una <strong>foto scattata sul momento</strong> (non dalla galleria) per essere sicuri di parlare con una persona vera. In più, voce reale: niente catfish.</p>
+      </div>
+      <div>
+        <div class="guide-h">📍 Posizione e raggio</div>
+        <p>Dal tuo profilo imposti il <strong>raggio</strong> di ricerca. Con la posizione attiva trovi persone nella tua zona e vedi la distanza approssimativa. La posizione è <strong>opzionale</strong>: senza, cerchi ovunque.</p>
+      </div>
+      <div>
+        <div class="guide-h">💘 Match giornalieri e Plus</div>
+        <p>Gratis hai <strong>5 match al giorno</strong>. Vuoi di più? <strong>Invita amici</strong> col tuo codice e sblocchi livelli gratis (10 / 20 / illimitati), oppure passa a <strong>Plus</strong>. Trovi tutto nella sezione ✨ Plus.</p>
+      </div>
+      <div>
+        <div class="guide-h">👀 Notifiche "persone live"</div>
+        <p>Puoi attivare dalle impostazioni un avviso che ti dice quante persone sono <strong>online in quel momento</strong>, così non perdi i momenti di movimento. <strong>Mai di notte</strong> (dall'1 alle 7): riposiamo tutti. 😴</p>
+      </div>
+      <div>
+        <div class="guide-h">🔄 Rivedi persone già viste</div>
+        <p>Di default non riproponiamo chi hai già incontrato. Se attivi <strong>"Rivedi persone già incontrate"</strong> dal profilo, potranno ricomparire — ma in una <strong>nuova sessione</strong>: chiudi e riapri l'app per ripartire.</p>
+      </div>
+      <div>
+        <div class="guide-h">🔒 Sicurezza</div>
+        <p>Solo maggiorenni (18+). Le foto passano una <strong>moderazione automatica</strong>. Puoi <strong>segnalare o bloccare</strong> chiunque e cancellare il tuo account quando vuoi.</p>
+      </div>
+      <div style="height:8px"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== TUTORIAL DI BENVENUTO (primo avvio) ===== -->
+<div id="tutorial">
+  <button class="tut-skip" onclick="closeTutorial(false)">Salta</button>
+  <div class="tut-slides" id="tutSlides">
+    <div class="tut-slide active">
+      <div class="tut-icon">💘</div>
+      <div class="tut-title">Benvenuto/a su Live<span style="color:var(--accent);font-style:italic;">Match</span></div>
+      <div class="tut-text">Niente profili impolverati: qui conosci gente <strong>vera, online proprio adesso</strong>.</div>
+    </div>
+    <div class="tut-slide">
+      <div class="tut-icon">⚡</div>
+      <div class="tut-title">Come funziona</div>
+      <div class="tut-text">Cerca, trova un match <strong>live</strong> e hai 30 secondi per non fare scena muta. Poi chattate. 😄</div>
+    </div>
+    <div class="tut-slide">
+      <div class="tut-icon">📸</div>
+      <div class="tut-title">Foto dal vivo</div>
+      <div class="tut-text">Il <strong>cuore di LiveMatch</strong>: foto scattate sul momento + voce reale. Niente catfish, solo persone vere.</div>
+    </div>
+    <div class="tut-slide">
+      <div class="tut-icon">📍</div>
+      <div class="tut-title">Vicino a te</div>
+      <div class="tut-text">Scegli il <strong>raggio</strong> di ricerca: con la posizione attiva trovi persone nella tua zona.</div>
+    </div>
+    <div class="tut-slide">
+      <div class="tut-icon">👀</div>
+      <div class="tut-title">Chi c'è adesso</div>
+      <div class="tut-text">Vedi quante persone sono <strong>online in tempo reale</strong>. Niente notifiche di notte, riposiamo tutti. 😴</div>
+    </div>
+  </div>
+  <div class="tut-dots" id="tutDots"></div>
+  <button class="btn-primary tut-next" id="tutNext" onclick="tutorialNext()">Avanti</button>
 </div>
 
 <script>
@@ -1669,6 +1806,7 @@ let currentProfile = null;
 let currentMatch = null;
 let matchedProfile = null;
 let sessionSeenIds = new Set(); // persone già proposte in questa sessione (Bug 1)
+let searchGen = 0; // "token" della ricerca: se annulli/navighi via, la ricerca in volo viene invalidata
 let incomingPhotoReq = false;   // true quando vedo il profilo di chi mi ha chiesto una foto (Bug 2)
 let matchTimer = null;
 let photoTimer = null;
@@ -1679,6 +1817,7 @@ let realtimeChannel = null;
 let photoReqChannel = null;
 let photoFulfilledChannel = null;
 let msgChannel = null;
+let _chatMsgCache = {}; // chatId -> messaggi già caricati (per riapertura istantanea, #6)
 let onlineChannel = null;
 let avatarFileToUpload = null;
 let currentAccessToken = null; // JWT della sessione, per richieste keepalive
@@ -1827,9 +1966,18 @@ async function shareInvite() {
   } catch (e) { return; } // condivisione annullata dall'utente
   copyInvite();
 }
+function miniToast(msg) {
+  let t = document.getElementById('miniToast');
+  if (!t) { t = document.createElement('div'); t.id = 'miniToast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 1500);
+}
 async function copyInvite() {
-  try { await navigator.clipboard.writeText(inviteMessage()); alert('Invito copiato! 📋 Incollalo dove vuoi.'); }
-  catch (e) { alert(inviteMessage()); }
+  try { await navigator.clipboard.writeText(inviteMessage()); }
+  catch (e) { /* clipboard non disponibile: il codice è comunque visibile a schermo */ }
+  miniToast('Copiato');
 }
 
 async function checkDailyLimit() {
@@ -2300,6 +2448,16 @@ async function saveEditProfile() {
 // 4. NAVIGATION — goTo, navTo, popups
 // ============================================================
 function navTo(screen) {
+  // Se stiamo lasciando la schermata di ricerca, annulla la ricerca in volo
+  // (altrimenti la sua navigazione asincrona ti "rimbalza" via). Fix bug nav.
+  const _cur = document.querySelector('.screen.active');
+  if (_cur && _cur.id === 's-searching' && screen !== 'searching') searchGen++;
+  // Cambio tab istantaneo: niente animazione slideUp (evita ritardo/rimbalzo percepito)
+  const _app = document.getElementById('app');
+  if (_app) {
+    _app.classList.add('instant');
+    requestAnimationFrame(() => requestAnimationFrame(() => _app.classList.remove('instant')));
+  }
   goTo(screen);
   // Aggiorna nav attivo in tutte le bottom-nav
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -2367,30 +2525,39 @@ async function loadChatList() {
     return;
   }
 
-  list.innerHTML = '';
-
   // ✅ FIX: una sola riga per persona (la chat canonica = match accettato più
   // vecchio). Senza questo, più match_requests con la stessa persona creavano
   // righe duplicate ("si apre una nuova chat").
   const seenOthers = new Set();
-
+  const rows = []; // { match, otherId }
   for (const match of matches) {
     const otherId = match.from_user === currentProfile.id ? match.to_user : match.from_user;
     if (seenOthers.has(otherId)) continue;
     seenOthers.add(otherId);
+    rows.push({ match, otherId });
+  }
 
-    // Carica profilo dell'altro utente (view pubblica, senza dati sensibili)
-    const { data: other } = await sb.from('profiles_public').select('*').eq('id', otherId).single();
+  // ⚡ PERFORMANCE: invece di 2 query PER chat (N+1, lentissimo), faccio 2 query
+  // TOTALI in parallelo: tutti i profili + tutti gli ultimi messaggi. (#6)
+  const otherIds = rows.map(r => r.otherId);
+  const chatIds = rows.map(r => r.match.id);
+  const [profRes, msgRes] = await Promise.all([
+    sb.from('profiles_public').select('*').in('id', otherIds),
+    sb.from('messages').select('chat_id, content, type, created_at').in('chat_id', chatIds).order('created_at', { ascending: false })
+  ]);
+  const profById = {};
+  (profRes.data || []).forEach(p => { profById[p.id] = p; });
+  const lastByChat = {};
+  (msgRes.data || []).forEach(m => { if (!lastByChat[m.chat_id]) lastByChat[m.chat_id] = m; }); // ordinati desc → il 1° è l'ultimo
+
+  list.innerHTML = '';
+  const frag = document.createDocumentFragment();
+
+  for (const { match, otherId } of rows) {
+    const other = profById[otherId];
     if (!other) continue;
 
-    // Carica ultimo messaggio
-    const { data: lastMsgs } = await sb.from('messages')
-      .select('content, type, created_at')
-      .eq('chat_id', match.id)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    const lastMsg = lastMsgs && lastMsgs.length > 0 ? lastMsgs[0] : null;
+    const lastMsg = lastByChat[match.id] || null;
     const preview = lastMsg
       ? (lastMsg.type === 'photo' ? '📸 Foto' : lastMsg.type === 'audio' ? '🎤 Messaggio vocale' : lastMsg.content)
       : 'Nessun messaggio ancora';
@@ -2398,7 +2565,6 @@ async function loadChatList() {
       ? formatTime(new Date(lastMsg.created_at))
       : formatTime(new Date(match.created_at));
 
-    // ✅ FIX: usa data-id per event delegation (più affidabile di onclick su iOS)
     const itemId = match.id;
     _chatListItems.set(itemId, { match, other });
     const item = document.createElement('div');
@@ -2409,9 +2575,7 @@ async function loadChatList() {
       ? `<img src="${safeUrl(other.avatar_url)}" alt="${escapeHtml(other.name)}"/>`
       : escapeHtml((other.name || '?')[0].toUpperCase());
 
-    const onlineDot = other.is_online
-      ? '<div class="chat-list-online"></div>'
-      : '';
+    const onlineDot = other.is_online ? '<div class="chat-list-online"></div>' : '';
 
     item.innerHTML = `
       <div class="chat-list-av">${avHtml}${onlineDot}</div>
@@ -2421,12 +2585,10 @@ async function loadChatList() {
       </div>
       <div class="chat-list-time">${escapeHtml(timeStr)}</div>
     `;
-    // ✅ FIX iOS: onclick diretto con closure (oltre alla delegation). Su Safari
-    // iOS è il modo più affidabile per registrare il tap; il guard in
-    // openChatFromList evita doppie aperture se scattano sia onclick che delegation.
     item.onclick = () => openChatFromList(match, other);
-    list.appendChild(item);
+    frag.appendChild(item);
   }
+  list.appendChild(frag);
 }
 
 function formatTime(date) {
@@ -2521,6 +2683,8 @@ async function init() {
     // Nasconde sempre il loader, qualunque cosa succeda
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
+    // Tutorial di benvenuto al primo avvio (sopra la schermata di login)
+    maybeShowTutorial();
   }
 
   sb.auth.onAuthStateChange(async (_event, session) => {
@@ -2724,7 +2888,14 @@ async function doLogout() {
   }
   await setOffline();
   await sb.auth.signOut();
+  // ✅ Azzera TUTTO lo stato di sessione: senza questo, il nuovo account ereditava
+  //    match/persone già viste del precedente (bug #7). searchGen++ invalida ricerche in volo.
   currentUser = null; currentProfile = null; currentAccessToken = null;
+  currentMatch = null; matchedProfile = null;
+  sessionSeenIds.clear();
+  _chatMsgCache = {};
+  planState = null;
+  searchGen++;
   goTo('auth');
 }
 
@@ -3039,6 +3210,19 @@ function resetRecUI(ctx) {
 // 7b. PUSH NOTIFICATIONS (solo app nativa iOS)
 // ============================================================
 let _pushSetup = false;
+// Salva/aggiorna il token push per l'utente corrente. Idempotente: lo richiamiamo
+// alla registrazione, dopo il login e al ritorno nell'app, così il token è SEMPRE
+// valido per chi è loggato ora (fix #4: notifiche che non arrivavano).
+async function savePushToken() {
+  if (!window._pushToken || !currentProfile) return;
+  try {
+    await sb.from('push_tokens').upsert(
+      { user_id: currentProfile.id, token: window._pushToken, platform: 'ios', updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,token' }
+    );
+  } catch (e) { console.warn('[Push] savePushToken', e); }
+}
+
 async function setupPushNotifications() {
   const Cap = window.Capacitor;
   // Solo nell'app nativa (in Safari/web il plugin non esiste)
@@ -3053,13 +3237,7 @@ async function setupPushNotifications() {
         const t = token && token.value;
         if (!t) return;
         window._pushToken = t;
-        if (currentProfile) {
-          await sb.from('push_tokens').upsert(
-            { user_id: currentProfile.id, token: t, platform: 'ios', updated_at: new Date().toISOString() },
-            { onConflict: 'user_id,token' }
-          );
-          console.log('[Push] token registrato');
-        }
+        savePushToken(); // salva per l'utente corrente (idempotente)
       });
       Push.addListener('registrationError', function(e) { console.warn('[Push] registrationError', e); });
       // Tap su una notifica → vai in chat
@@ -3141,13 +3319,15 @@ function handleVisibility() {
       .update({ is_online: true, last_seen: new Date().toISOString() })
       .eq('id', currentUser.id)
       .then(() => loadOnlineCount());
+    // Ri-registra/aggiorna il token push: garantisce notifiche affidabili (#4)
+    setupPushNotifications();
   }
 }
 
 function setOfflineSync() {
   // keepalive fetch: funziona anche quando la pagina sta chiudendo (mobile background)
   if (!currentUser) return;
-  const body = JSON.stringify({ is_online: false, last_seen: new Date().toISOString() });
+  const body = JSON.stringify({ is_online: false, last_seen: new Date(Date.now() - 120000).toISOString() });
   // ✅ FIX: l'Authorization deve usare il JWT della sessione (non l'anon key) —
   //   altrimenti le RLS bloccano l'UPDATE e l'utente resta "online" fantasma.
   //   Inoltre prima era una stringa tra apici singoli: inviava il testo
@@ -3168,8 +3348,10 @@ function setOfflineSync() {
 
 async function setOffline() {
   if (!currentUser) return;
+  // ✅ last_seen nel PASSATO (oltre la finestra "live" di 90s): così l'account
+  //    sloggato/in background NON riappare nelle ricerche degli altri. (#7)
   await sb.from('profiles')
-    .update({ is_online: false, last_seen: new Date().toISOString() })
+    .update({ is_online: false, last_seen: new Date(Date.now() - 120000).toISOString() })
     .eq('id', currentUser.id);
 }
 
@@ -3205,6 +3387,7 @@ async function findMatch() {
   if (!withinLimit) return;
 
   goTo('searching');
+  const gen = ++searchGen; // questa è la ricerca corrente
 
   const msgs = ['Frugo tra i single della zona…','Cerco qualcuno alla tua altezza…','Incrocio le dita per te…','Ci siamo quasi…'];
   let i = 0;
@@ -3218,19 +3401,20 @@ async function findMatch() {
 
   // ✅ Soglia 90s (allineata al heartbeat di 30s)
   const onlineThreshold = new Date(Date.now() - 90 * 1000).toISOString();
-  // Candidati dalla view pubblica (no email/GPS). Nota: senza latitude/longitude
-  // il filtro distanza si disattiva da solo (le guardie `c.latitude` lo gestiscono).
-  const { data: candidates } = await sb.from('profiles_public')
-    .select('*')
-    .gte('last_seen', onlineThreshold)
-    .neq('id', currentProfile.id)
-    .limit(50);
+  // ⚡ Candidati live + filtro distanza LATO SERVER (privacy-safe): l'RPC conosce
+  // le coordinate (che restano sul server) e restituisce solo chi è entro il raggio
+  // scelto + una distanza approssimativa (dist_km). Se non ho la posizione o il
+  // raggio è "illimitato", l'RPC non filtra per distanza. (#12)
+  const maxDist = currentProfile.max_distance || 50;
+  const { data: candidates, error: candErr } = await sb.rpc('find_live_candidates', { p_max_dist: maxDist });
+  if (candErr) console.error('[findMatch] find_live_candidates error:', candErr);
 
   clearInterval(interval);
+  if (gen !== searchGen) return; // ricerca annullata / l'utente è andato altrove → non navigare
 
   if (!candidates || candidates.length === 0) {
     el.textContent = 'Nessun utente online in questo momento…';
-    setTimeout(() => goTo('waiting'), 2500);
+    setTimeout(() => { if (gen === searchGen) goTo('waiting'); }, 2500);
     return;
   }
 
@@ -3260,11 +3444,12 @@ async function findMatch() {
     .select('blocker_id')
     .eq('blocked_id', currentProfile.id);
   const blockedByIds = new Set((blockedByUsers || []).map(b => b.blocker_id));
+  if (gen !== searchGen) return; // l'utente ha lasciato la ricerca → non navigare
 
-  // Filtra candidati
+  // Filtra candidati (maxDist già dichiarato sopra; la distanza è già filtrata
+  // dall'RPC lato server)
   const minAge = currentProfile.min_age || 18;
   const maxAge = currentProfile.max_age || 99;
-  const maxDist = currentProfile.max_distance || 50;
 
   const compatible = candidates.filter(c => {
     if (!isCompatible(currentProfile, c)) return false;
@@ -3277,11 +3462,6 @@ async function findMatch() {
     if (blockedByIds.has(c.id)) return false;
     // Filtro età
     if (c.age < minAge || c.age > maxAge) return false;
-    // Filtro distanza (se entrambi hanno posizione)
-    if (currentProfile.latitude && c.latitude && maxDist < 500) {
-      const dist = getDistanceKm(currentProfile.latitude, currentProfile.longitude, c.latitude, c.longitude);
-      if (dist > maxDist) return false;
-    }
     return true;
   });
 
@@ -3292,7 +3472,7 @@ async function findMatch() {
     } else {
       el.textContent = 'Nessun match compatibile ora. Riprova tra poco!';
     }
-    setTimeout(() => goTo('waiting'), 3000);
+    setTimeout(() => { if (gen === searchGen) goTo('waiting'); }, 3000);
     return;
   }
 
@@ -3328,11 +3508,10 @@ function renderMatchScreen(p) {
   document.getElementById('matchName').textContent = p.name + ', ' + p.age;
   document.getElementById('matchAge').textContent = p.age + ' anni';
   document.getElementById('matchCity').textContent = p.city;
-  // Mostra distanza se disponibile
-  if (currentProfile?.latitude && p.latitude) {
-    const dist = Math.round(getDistanceKm(currentProfile.latitude, currentProfile.longitude, p.latitude, p.longitude));
+  // Mostra distanza approssimativa (dal server, privacy-safe) se disponibile (#12)
+  if (p.dist_km != null) {
     const cityEl = document.getElementById('matchCity');
-    if (cityEl) cityEl.textContent = p.city + ' · ' + dist + 'km';
+    if (cityEl) cityEl.textContent = p.city + ' · ~' + p.dist_km + ' km';
   }
   document.getElementById('matchBio').textContent = p.bio || '';
 
@@ -3404,6 +3583,7 @@ function closeLightbox() {
 }
 
 function cancelSearch() {
+  searchGen++; // annulla la ricerca in corso così non "rimbalza" più
   goTo('waiting');
 }
 
@@ -3469,7 +3649,7 @@ function renderWaitingResponse(partner) {
     if (secs <= 0) {
       clearInterval(waitingRespTimer); waitingRespTimer = null;
       if (window._matchPoller) { clearInterval(window._matchPoller); window._matchPoller = null; }
-      document.getElementById('popupExpired').classList.add('show');
+      showExpiredPopup();
     }
   }, 1000);
 
@@ -3562,7 +3742,7 @@ async function expireMatch() {
   }
   currentMatch = null;
   matchedProfile = null;
-  document.getElementById('popupExpired').classList.add('show');
+  showExpiredPopup();
 }
 
 async function rejectMatch(autoSearch = true) {
@@ -3575,12 +3755,16 @@ async function rejectMatch(autoSearch = true) {
       .eq('id', currentMatch.id);
   } else if (matchedProfile && currentProfile) {
     // ✅ FIX: nessun record in DB ancora (A ha visto B senza accettare)
-    // Crea un record 'rejected' così B non ricompare nelle prossime ricerche
-    await sb.from('match_requests').insert({
-      from_user: currentProfile.id,
-      to_user: matchedProfile.id,
-      status: 'rejected'
-    }).catch(() => {}); // ignora race condition / RLS errors
+    // Crea un record 'rejected' così B non ricompare nelle prossime ricerche.
+    // ⚠️ Bug #7: prima usava `.catch()` sul query-builder Supabase (NON è un
+    //    metodo valido) → lanciava un errore e "Rifiuta" si bloccava. Ora try/catch.
+    try {
+      await sb.from('match_requests').insert({
+        from_user: currentProfile.id,
+        to_user: matchedProfile.id,
+        status: 'rejected'
+      });
+    } catch (e) { /* ignora race condition / RLS */ }
   }
 
   currentMatch = null;
@@ -3963,7 +4147,7 @@ function goToWaitingPhoto() {
         await sb.from('match_requests').update({ status: 'expired' }).eq('id', currentMatch.id);
       }
       currentMatch = null; matchedProfile = null;
-      document.getElementById('popupExpired').classList.add('show');
+      showExpiredPopup();
     }
   }, 1000);
 
@@ -4179,29 +4363,43 @@ async function subscribeToMessages() {
 
   // Carica tutti i messaggi esistenti
   async function loadAllMessages() {
-    const { data, error } = await sb.from('messages')
-      .select('*')
-      .eq('chat_id', chatId)
-      .order('created_at', { ascending: true });
-
-    if (error) { console.error('load messages error:', error); return; }
-
     const msgsArea = document.getElementById('messages');
     if (!msgsArea) return;
 
+    // Intestazione
     msgsArea.innerHTML = '';
     const sys = document.createElement('div');
     sys.className = 'sys-msg';
     sys.textContent = 'Match live con ' + (matchedProfile ? matchedProfile.name : '') + '!';
     msgsArea.appendChild(sys);
 
-    if (data && data.length > 0) {
-      for (const m of data) {
+    // ⚡ Render ISTANTANEO dalla cache (se la chat è già stata aperta in questa
+    //    sessione) → niente schermata vuota in attesa della rete. (#6)
+    const cached = _chatMsgCache[chatId];
+    if (cached && cached.length) {
+      for (const m of cached) {
         knownMsgIds.add(m.id);
-        m.sender = await getSender(m.sender_id);
-        renderMessage(m);
+        if (!m.sender) m.sender = profileCache[m.sender_id];
+        renderMessage(m, true); // batch: niente scroll per ogni messaggio
       }
+      msgsArea.scrollTop = msgsArea.scrollHeight;
     }
+
+    // Fetch fresco dal server (in background se c'era la cache)
+    const { data, error } = await sb.from('messages')
+      .select('*').eq('chat_id', chatId).order('created_at', { ascending: true });
+    if (error) { console.error('load messages error:', error); return; }
+
+    _chatMsgCache[chatId] = data || []; // aggiorna cache per la prossima apertura
+    let added = false;
+    for (const m of (data || [])) {
+      if (knownMsgIds.has(m.id)) continue; // già mostrato (dalla cache)
+      knownMsgIds.add(m.id);
+      m.sender = await getSender(m.sender_id);
+      renderMessage(m, true);
+      added = true;
+    }
+    if (added) msgsArea.scrollTop = msgsArea.scrollHeight;
   }
 
   await loadAllMessages();
@@ -4259,7 +4457,7 @@ async function subscribeToMessages() {
 }
 
 
-function renderMessage(msg) {
+function renderMessage(msg, noScroll) {
   const msgs = document.getElementById('messages');
   const isMe = msg.sender_id === currentProfile.id;
 
@@ -4268,7 +4466,7 @@ function renderMessage(msg) {
     sys.className = 'sys-msg';
     sys.textContent = msg.content;
     msgs.appendChild(sys);
-    msgs.scrollTop = msgs.scrollHeight;
+    if (!noScroll) msgs.scrollTop = msgs.scrollHeight;
     return;
   }
 
@@ -4300,7 +4498,7 @@ function renderMessage(msg) {
   }
   row.appendChild(bub);
   msgs.appendChild(row);
-  msgs.scrollTop = msgs.scrollHeight;
+  if (!noScroll) msgs.scrollTop = msgs.scrollHeight;
 }
 
 async function sendMessage() {
@@ -4380,19 +4578,23 @@ async function sendPhotoMessage(e) {
 // ============================================================
 let _chatRec = null, _chatChunks = [], _chatRecTimer = null;
 
-async function toggleChatVoice() {
-  // se sta registrando → ferma (e invia nell'onstop)
-  if (_chatRec && _chatRec.state === 'recording') { stopChatVoice(); return; }
+// ===== VOCALE STILE WHATSAPP: tieni premuto = registra, rilascia = invia,
+//       scorri a sinistra = annulla. (#11b) =====
+let _chatVoiceCancel = false, _chatVoiceActive = false, _chatVoicePressing = false, _chatRecStart = 0;
+
+async function startChatVoice() {
+  if (_chatVoiceActive) return;
   if (!currentMatch || !currentProfile) return;
-  if (!navigator.mediaDevices || !window.MediaRecorder) {
-    alert('La registrazione audio non è supportata su questo browser.');
-    return;
-  }
+  if (!navigator.mediaDevices || !window.MediaRecorder) { miniToast('Audio non supportato'); return; }
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch (e) { alert('Permesso microfono negato o non disponibile.'); return; }
+  catch (e) { miniToast('Microfono non disponibile'); return; }
+  // Se l'utente ha già rilasciato mentre chiedeva il permesso → non registrare
+  if (!_chatVoicePressing) { stream.getTracks().forEach(t => t.stop()); return; }
 
   _chatChunks = [];
+  _chatVoiceCancel = false;
+  _chatVoiceActive = true;
   let rec;
   try { rec = new MediaRecorder(stream); }
   catch (e) { rec = new MediaRecorder(stream, { mimeType: 'audio/mp4' }); }
@@ -4401,33 +4603,80 @@ async function toggleChatVoice() {
   rec.onstop = async () => {
     stream.getTracks().forEach(t => t.stop());
     if (_chatRecTimer) { clearInterval(_chatRecTimer); _chatRecTimer = null; }
-    setChatMicUI(false);
+    showRecBar(false);
+    _chatVoiceActive = false;
+    const dur = Date.now() - _chatRecStart;
     const type = rec.mimeType || 'audio/webm';
     const blob = new Blob(_chatChunks, { type });
+    if (_chatVoiceCancel) return;                       // annullato con lo swipe
+    if (dur < 600) { miniToast('Tieni premuto per registrare'); return; } // tap troppo breve
     if (blob.size > 0) await sendVoiceMessage(blob, type);
   };
   rec.start();
-
-  setChatMicUI(true, 15);
-  let s = 15;
+  _chatRecStart = Date.now();
+  showRecBar(true);
   if (_chatRecTimer) clearInterval(_chatRecTimer);
   _chatRecTimer = setInterval(() => {
-    s--;
-    setChatMicUI(true, s);
-    if (s <= 0) stopChatVoice();
-  }, 1000);
+    const s = Math.floor((Date.now() - _chatRecStart) / 1000);
+    updateRecTime(s);
+    if (s >= 60) stopChatVoice(false); // limite 60s
+  }, 250);
 }
 
-function stopChatVoice() {
+function stopChatVoice(cancel) {
+  if (cancel) _chatVoiceCancel = true;
   if (_chatRec && _chatRec.state === 'recording') _chatRec.stop();
+  else { _chatVoiceActive = false; showRecBar(false); }
 }
 
-function setChatMicUI(recording, secs) {
+function showRecBar(on) {
+  const row = document.getElementById('chatInputRow');
+  const mic = document.getElementById('chatMicBtn');
+  if (row) row.classList.toggle('recording', on);
+  if (mic) mic.classList.toggle('recording', on);
+  if (!on) {
+    const bar = document.getElementById('chatRecBar');
+    if (bar) bar.classList.remove('cancel');
+    updateRecTime(0);
+  }
+}
+function updateRecTime(s) {
+  const el = document.getElementById('chatRecTime');
+  if (el) el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function setRecCancel(armed) {
+  _chatVoiceCancel = armed;
+  const bar = document.getElementById('chatRecBar');
+  const hint = document.getElementById('chatRecHint');
+  if (bar) bar.classList.toggle('cancel', armed);
+  if (hint) hint.textContent = armed ? 'Rilascia per annullare' : '‹ scorri per annullare';
+}
+
+// Aggancia il "tieni premuto" al pulsante microfono (touch + mouse via Pointer Events)
+(function setupMicHold() {
   const btn = document.getElementById('chatMicBtn');
   if (!btn) return;
-  if (recording) { btn.classList.add('recording'); btn.textContent = (secs != null ? secs : '■'); }
-  else { btn.classList.remove('recording'); btn.textContent = '🎤'; }
-}
+  let sx = 0;
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    _chatVoicePressing = true;
+    sx = e.clientX;
+    try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+    startChatVoice();
+  });
+  btn.addEventListener('pointermove', (e) => {
+    if (!_chatVoiceActive) return;
+    setRecCancel((e.clientX - sx) < -55); // scorri a sinistra oltre 55px → annulla
+  });
+  const end = (e) => {
+    if (!_chatVoicePressing) return;
+    _chatVoicePressing = false;
+    try { btn.releasePointerCapture(e.pointerId); } catch (_) {}
+    stopChatVoice(_chatVoiceCancel);
+  };
+  btn.addEventListener('pointerup', end);
+  btn.addEventListener('pointercancel', () => { if (_chatVoicePressing) { _chatVoicePressing = false; stopChatVoice(true); } });
+})();
 
 async function sendVoiceMessage(blob, type) {
   if (!blob || !currentMatch || !currentProfile) return;
@@ -4435,13 +4684,15 @@ async function sendVoiceMessage(blob, type) {
     const ext = type.includes('mp4') ? 'm4a' : type.includes('mpeg') ? 'mp3' : type.includes('ogg') ? 'ogg' : 'webm';
     const path = currentMatch.id + '/voice-' + currentProfile.id + '-' + Date.now() + '.' + ext;
     const buf = await blob.arrayBuffer();
-    const { error } = await sb.storage.from('live-photos').upload(path, buf, { contentType: type, upsert: true });
-    if (error) { console.error('[Voice] upload error:', error); return; }
+    const { error: upErr } = await sb.storage.from('live-photos').upload(path, buf, { contentType: type, upsert: true });
+    if (upErr) { console.error('[Voice] upload error:', upErr); miniToast('Audio non inviato'); return; }
     const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
     const msg = { chat_id: currentMatch.id, sender_id: currentProfile.id, content: urlData.publicUrl, type: 'audio' };
+    // Inserisci PRIMA nel DB: mostro la bolla solo se è andato a buon fine (niente "bolla finta")
+    const { error: insErr } = await sb.from('messages').insert(msg);
+    if (insErr) { console.error('[Voice] insert error:', insErr); miniToast('Audio non inviato'); return; }
     renderMessage({ ...msg, sender: currentProfile, created_at: new Date().toISOString() });
-    await sb.from('messages').insert(msg);
-  } catch (e) { console.error('[Voice] send error:', e); }
+  } catch (e) { console.error('[Voice] send error:', e); miniToast('Audio non inviato'); }
 }
 
 let typingTimeout = null;
@@ -4638,13 +4889,86 @@ async function subscribeToMatches() {
     .subscribe();
 }
 
+// Mostra "Tempo scaduto" SOLO se non sei già in una chat attiva (match accettato).
+// Evita il falso popup quando esci e rientri in una chat. (Fix #2b)
+function showExpiredPopup() {
+  const active = document.querySelector('.screen.active');
+  if (active && active.id === 's-chat') return;
+  document.getElementById('popupExpired').classList.add('show');
+}
+
 function leaveChat() {
   if (msgChannel) { sb.removeChannel(msgChannel); msgChannel = null; }
   if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
   if (window._photoPoller) { clearInterval(window._photoPoller); window._photoPoller = null; }
   if (window._matchPoller) { clearInterval(window._matchPoller); window._matchPoller = null; }
+  // ✅ Azzera anche il timer di attesa-risposta: se restava attivo, scattava un
+  //    falso "Tempo scaduto" dopo essere usciti/rientrati nella chat. (Fix #2b)
+  if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
   navTo('waiting');
 }
+
+// Swipe a sinistra per uscire dalla chat (oltre al pulsante ← in alto)
+(function setupChatSwipe() {
+  const chat = document.getElementById('s-chat');
+  if (!chat) return;
+  let sx = 0, sy = 0, tracking = false;
+  chat.addEventListener('touchstart', (e) => {
+    // Non interferire con controlli interattivi (audio/slider/input/bottoni)
+    if (e.target.closest('input, button, audio, a, textarea, .send-btn, .chat-mic-btn, .chat-photo-btn, .bubble img')) { tracking = false; return; }
+    const t = e.touches[0]; sx = t.clientX; sy = t.clientY; tracking = true;
+  }, { passive: true });
+  chat.addEventListener('touchend', (e) => {
+    if (!tracking) return; tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    // Swipe orizzontale netto verso SINISTRA → esci dalla chat
+    if (dx < -70 && Math.abs(dx) > Math.abs(dy) * 1.6) leaveChat();
+  }, { passive: true });
+})();
+
+// ============================================================
+// TUTORIAL DI BENVENUTO (primo avvio)
+// ============================================================
+let _tutIndex = 0;
+const _TUT_COUNT = 5;
+function maybeShowTutorial() {
+  try { if (localStorage.getItem('livematch_tutorial_seen')) return; } catch (e) {}
+  const t = document.getElementById('tutorial');
+  if (!t) return;
+  showTutSlide(0);
+  t.classList.add('show');
+}
+function showTutSlide(i) {
+  _tutIndex = i;
+  document.querySelectorAll('#tutorial .tut-slide').forEach((s, idx) => s.classList.toggle('active', idx === i));
+  const dots = document.getElementById('tutDots');
+  if (dots) dots.innerHTML = Array.from({ length: _TUT_COUNT }, (_, idx) => `<div class="tut-dot${idx === i ? ' active' : ''}"></div>`).join('');
+  const next = document.getElementById('tutNext');
+  if (next) next.textContent = (i === _TUT_COUNT - 1) ? 'Inizia' : 'Avanti';
+}
+function tutorialNext() {
+  if (_tutIndex < _TUT_COUNT - 1) showTutSlide(_tutIndex + 1);
+  else closeTutorial(true);
+}
+function closeTutorial(start) {
+  try { localStorage.setItem('livematch_tutorial_seen', '1'); } catch (e) {}
+  const t = document.getElementById('tutorial');
+  if (t) t.classList.remove('show');
+  if (start) { try { goTo('register'); } catch (e) {} }
+}
+// Swipe orizzontale tra le slide
+(function setupTutorialSwipe() {
+  const el = document.getElementById('tutSlides');
+  if (!el) return;
+  let sx = 0;
+  el.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+  el.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - sx;
+    if (dx < -50 && _tutIndex < _TUT_COUNT - 1) showTutSlide(_tutIndex + 1);
+    else if (dx > 50 && _tutIndex > 0) showTutSlide(_tutIndex - 1);
+  }, { passive: true });
+})();
 
 // ============================================================
 // START
