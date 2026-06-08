@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>LiveMatch — Admin</title>
+<script src="vendor/supabase.js"></script>
+<style>
+  :root{--bg:#0f1117;--surface:#171a23;--surface2:#1f232e;--accent:#ff4d6d;--green:#28c76f;--text:#f2f3f7;--text2:#9aa0ad;--border:rgba(255,255,255,0.08);}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;min-height:100vh;}
+  .wrap{max-width:760px;margin:0 auto;padding:20px 16px 60px;}
+  .logo{font-weight:700;font-size:22px;margin-bottom:18px;}
+  .logo span{color:var(--accent);font-style:italic;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:16px;}
+  h2{font-size:15px;margin:0 0 12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);}
+  label{display:block;font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin:12px 0 5px;}
+  input,textarea,select{width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--surface2);color:var(--text);outline:none;font-family:inherit;}
+  input:focus,textarea:focus,select:focus{border-color:var(--accent);}
+  textarea{resize:vertical;min-height:60px;}
+  button{padding:11px 16px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;}
+  button:disabled{opacity:.55;cursor:default;}
+  button.ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+  button.danger{background:#d9342b;}
+  button.ok{background:var(--green);}
+  button.sm{padding:7px 11px;font-size:12.5px;}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .tabs button{background:var(--surface2);color:var(--text2);border:1px solid var(--border);}
+  .tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;}
+  .stat{background:var(--surface2);border-radius:12px;padding:14px;}
+  .stat .n{font-size:26px;font-weight:700;}
+  .stat .l{font-size:12px;color:var(--text2);margin-top:2px;}
+  .msg{font-size:13px;margin-top:10px;min-height:18px;}
+  .msg.err{color:var(--accent);} .msg.ok{color:var(--green);}
+  .switch{display:flex;align-items:center;gap:10px;margin-top:12px;}
+  .switch input{width:auto;}
+  .item{background:var(--surface2);border-radius:10px;padding:11px 13px;margin-top:8px;font-size:13.5px;}
+  .item .meta{color:var(--text2);font-size:12px;margin-top:3px;}
+  .pill{display:inline-block;font-size:11px;padding:2px 7px;border-radius:20px;background:#3a2230;color:var(--accent);margin-left:6px;}
+  .hidden{display:none;}
+  small.hint{color:var(--text2);font-size:11.5px;display:block;margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">Live<span>Match</span> · Admin</div>
+
+  <!-- LOGIN -->
+  <div id="loginCard" class="card">
+    <h2>Accesso admin</h2>
+    <label>Email</label><input id="email" type="email" autocomplete="username"/>
+    <label>Password</label><input id="password" type="password" autocomplete="current-password"/>
+    <div style="margin-top:14px"><button id="loginBtn" onclick="doLogin()">Entra</button></div>
+    <div id="loginMsg" class="msg"></div>
+  </div>
+
+  <!-- PANNELLO -->
+  <div id="panel" class="hidden">
+    <div class="row" style="justify-content:space-between;margin-bottom:14px;">
+      <div id="who" style="font-size:13px;color:var(--text2)"></div>
+      <button class="ghost sm" onclick="doLogout()">Esci</button>
+    </div>
+    <div class="tabs">
+      <button data-tab="dash" class="active" onclick="showTab('dash')">📊 Dashboard</button>
+      <button data-tab="config" onclick="showTab('config')">🛠️ App / Manutenzione</button>
+      <button data-tab="push" onclick="showTab('push')">📣 Notifiche</button>
+      <button data-tab="mod" onclick="showTab('mod')">🛡️ Moderazione</button>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="tab-dash" class="tabpane card">
+      <h2>Statistiche</h2>
+      <div id="stats" class="grid"></div>
+      <div style="margin-top:14px"><button class="ghost sm" onclick="loadStats()">Aggiorna</button></div>
+    </div>
+
+    <!-- CONFIG -->
+    <div id="tab-config" class="tabpane card hidden">
+      <h2>Manutenzione & aggiornamento</h2>
+      <div class="switch"><input type="checkbox" id="cfgMaint"/><label style="margin:0">Modalità manutenzione (blocca l'app per tutti)</label></div>
+      <label>Titolo manutenzione</label><input id="cfgMaintTitle"/>
+      <label>Messaggio manutenzione</label><textarea id="cfgMaintMsg"></textarea>
+      <label>Build minimo richiesto (forza aggiornamento se l'app è più vecchia)</label>
+      <input id="cfgMinBuild" type="number" min="0"/>
+      <small class="hint">Es: se metti 6, chi ha il build 5 o precedente vede la schermata "Aggiorna". 0 = disattivato.</small>
+      <label>Titolo aggiornamento</label><input id="cfgUpdTitle"/>
+      <label>Messaggio aggiornamento</label><textarea id="cfgUpdMsg"></textarea>
+      <label>Annuncio in-app (banner non bloccante, opzionale)</label><textarea id="cfgAnnounce"></textarea>
+      <div style="margin-top:14px"><button onclick="saveConfig()">Salva configurazione</button></div>
+      <div id="cfgMsg" class="msg"></div>
+    </div>
+
+    <!-- PUSH -->
+    <div id="tab-push" class="tabpane card hidden">
+      <h2>Invia notifica push</h2>
+      <label>Destinatari</label>
+      <select id="bcSegment">
+        <option value="all">Tutti gli utenti</option>
+        <option value="inactive">Inattivi da 7+ giorni</option>
+        <option value="online">Online adesso</option>
+      </select>
+      <label>Titolo</label><input id="bcTitle" maxlength="80" placeholder="Es: Novità su LiveMatch!"/>
+      <label>Testo</label><textarea id="bcBody" maxlength="200" placeholder="Es: Abbiamo aggiunto..."></textarea>
+      <div style="margin-top:14px"><button id="bcBtn" onclick="sendBroadcast()">Invia a tutti</button></div>
+      <div id="bcMsg" class="msg"></div>
+      <small class="hint">Arriva solo a chi ha concesso le notifiche su iOS. Niente invii notturni lato sistema.</small>
+    </div>
+
+    <!-- MODERAZIONE -->
+    <div id="tab-mod" class="tabpane card hidden">
+      <h2>Segnalazioni</h2>
+      <div id="reports"></div>
+      <div style="margin-top:10px"><button class="ghost sm" onclick="loadReports()">Aggiorna segnalazioni</button></div>
+      <h2 style="margin-top:22px">Cerca / gestisci utenti</h2>
+      <div class="row"><input id="uSearch" placeholder="Nome o email…" style="flex:1"/><button class="sm" onclick="searchUsers()">Cerca</button></div>
+      <div id="users"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const SB_URL = 'https://dmzozvidylvdaclzyeqk.supabase.co';
+  const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtem96dmlkeWx2ZGFjbHp5ZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzgyODQsImV4cCI6MjA5NTQxNDI4NH0.dmdHfeoXrPHCpFzOMxoVo8TtTuj1M9KRPnOUWRMn2sE';
+  const sb = supabase.createClient(SB_URL, SB_ANON);
+
+  const $ = (id) => document.getElementById(id);
+  function setMsg(id, text, ok){ const e=$(id); e.textContent=text; e.className='msg '+(ok?'ok':'err'); }
+
+  async function init(){
+    const { data } = await sb.auth.getSession();
+    if (data.session) await afterLogin();
+  }
+  init();
+
+  async function doLogin(){
+    const btn=$('loginBtn'); btn.disabled=true; setMsg('loginMsg','Accesso…',true);
+    const { error } = await sb.auth.signInWithPassword({ email:$('email').value.trim(), password:$('password').value });
+    btn.disabled=false;
+    if (error){ setMsg('loginMsg', error.message, false); return; }
+    await afterLogin();
+  }
+
+  async function afterLogin(){
+    // Verifica admin
+    const { data: ok, error } = await sb.rpc('is_admin');
+    if (error || !ok){
+      setMsg('loginMsg','Questo account non è admin.', false);
+      await sb.auth.signOut();
+      return;
+    }
+    const { data: u } = await sb.auth.getUser();
+    $('who').textContent = 'Connesso come ' + (u?.user?.email || 'admin');
+    $('loginCard').classList.add('hidden');
+    $('panel').classList.remove('hidden');
+    loadStats(); loadConfig();
+  }
+
+  async function doLogout(){ await sb.auth.signOut(); location.reload(); }
+
+  function showTab(t){
+    document.querySelectorAll('.tabpane').forEach(p=>p.classList.add('hidden'));
+    $('tab-'+t).classList.remove('hidden');
+    document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
+    if (t==='mod'){ loadReports(); }
+  }
+
+  // ---- Dashboard ----
+  async function loadStats(){
+    const { data, error } = await sb.rpc('admin_stats');
+    if (error){ $('stats').innerHTML='<div class="msg err">'+error.message+'</div>'; return; }
+    const map = [
+      ['users_total','Utenti totali'],['online_now','Online ora'],['signups_today','Iscritti oggi'],
+      ['signups_7d','Iscritti 7gg'],['matches_today','Match oggi'],['matches_accepted_today','Match accettati oggi'],
+      ['messages_today','Messaggi oggi'],['users_banned','Bannati'],['reports_total','Segnalazioni'],['push_tokens','Token push'],
+    ];
+    $('stats').innerHTML = map.map(([k,l])=>`<div class="stat"><div class="n">${data[k]??0}</div><div class="l">${l}</div></div>`).join('');
+  }
+
+  // ---- Config ----
+  async function loadConfig(){
+    const { data } = await sb.from('app_config').select('*').eq('id',1).maybeSingle();
+    if (!data) return;
+    $('cfgMaint').checked = !!data.maintenance;
+    $('cfgMaintTitle').value = data.maintenance_title||'';
+    $('cfgMaintMsg').value = data.maintenance_msg||'';
+    $('cfgMinBuild').value = data.min_build||0;
+    $('cfgUpdTitle').value = data.update_title||'';
+    $('cfgUpdMsg').value = data.update_msg||'';
+    $('cfgAnnounce').value = data.announce||'';
+  }
+  async function saveConfig(){
+    setMsg('cfgMsg','Salvataggio…',true);
+    const { error } = await sb.rpc('admin_set_config', {
+      p_maintenance: $('cfgMaint').checked,
+      p_maint_title: $('cfgMaintTitle').value,
+      p_maint_msg: $('cfgMaintMsg').value,
+      p_min_build: parseInt($('cfgMinBuild').value||'0',10),
+      p_upd_title: $('cfgUpdTitle').value,
+      p_upd_msg: $('cfgUpdMsg').value,
+      p_announce: $('cfgAnnounce').value || null,
+    });
+    setMsg('cfgMsg', error? error.message : '✓ Salvato', !error);
+  }
+
+  // ---- Broadcast ----
+  async function sendBroadcast(){
+    const title=$('bcTitle').value.trim(), body=$('bcBody').value.trim();
+    if(!title||!body){ setMsg('bcMsg','Inserisci titolo e testo.',false); return; }
+    const seg=$('bcSegment').value;
+    if(!confirm(`Inviare la notifica a "${seg==='all'?'TUTTI gli utenti':seg}"?`)) return;
+    const btn=$('bcBtn'); btn.disabled=true; setMsg('bcMsg','Invio in corso…',true);
+    const { data:{ session } } = await sb.auth.getSession();
+    try{
+      const res = await fetch(SB_URL+'/functions/v1/admin-broadcast', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+session.access_token },
+        body: JSON.stringify({ title, body, segment:seg })
+      });
+      const j = await res.json();
+      if(!res.ok){ setMsg('bcMsg', j.error||'Errore', false); }
+      else setMsg('bcMsg', `✓ Inviata: ${j.sent} consegnate / ${j.recipients} destinatari (${j.failed} fallite)`, true);
+    }catch(e){ setMsg('bcMsg', String(e), false); }
+    btn.disabled=false;
+  }
+
+  // ---- Moderazione ----
+  async function loadReports(){
+    const { data, error } = await sb.rpc('admin_list_reports');
+    if (error){ $('reports').innerHTML='<div class="msg err">'+error.message+'</div>'; return; }
+    if (!data || !data.length){ $('reports').innerHTML='<div class="item">Nessuna segnalazione 🎉</div>'; return; }
+    $('reports').innerHTML = data.map(r=>`
+      <div class="item">
+        <b>${esc(r.reported_name||'?')}</b> ${r.reported_banned?'<span class="pill">BANNATO</span>':''}
+        <div class="meta">Motivo: ${esc(r.reason||'-')} · segnalato da ${esc(r.reporter_name||'?')} · ${new Date(r.created_at).toLocaleString('it-IT')}</div>
+        <div style="margin-top:8px" class="row">
+          ${r.reported_banned
+            ? `<button class="ok sm" onclick="unban('${r.reported_id}')">Sblocca</button>`
+            : `<button class="danger sm" onclick="ban('${r.reported_id}','${esc(r.reason||'')}')">Banna utente</button>`}
+        </div>
+      </div>`).join('');
+  }
+  async function searchUsers(){
+    const { data, error } = await sb.rpc('admin_search_users', { p_q: $('uSearch').value.trim() });
+    if (error){ $('users').innerHTML='<div class="msg err">'+error.message+'</div>'; return; }
+    if (!data || !data.length){ $('users').innerHTML='<div class="item">Nessun risultato.</div>'; return; }
+    $('users').innerHTML = data.map(u=>`
+      <div class="item">
+        <b>${esc(u.name||'?')}</b>, ${u.age||'?'} ${u.banned?'<span class="pill">BANNATO</span>':''} ${u.is_admin?'<span class="pill" style="background:#1d3326;color:#28c76f">ADMIN</span>':''}
+        <div class="meta">${esc(u.email||'')} · ${esc(u.city||'')} · iscritto ${new Date(u.created_at).toLocaleDateString('it-IT')}</div>
+        <div style="margin-top:8px" class="row">
+          ${u.banned
+            ? `<button class="ok sm" onclick="unban('${u.id}')">Sblocca</button>`
+            : `<button class="danger sm" onclick="ban('${u.id}','')">Banna</button>`}
+        </div>
+      </div>`).join('');
+  }
+  async function ban(id, reason){
+    const r = prompt('Motivo del ban (opzionale):', reason||'');
+    if (r===null) return;
+    const { error } = await sb.rpc('admin_ban_user', { p_uid:id, p_reason:r });
+    if (error){ alert(error.message); return; }
+    loadReports(); searchUsers(); loadStats();
+  }
+  async function unban(id){
+    if(!confirm('Sbloccare questo utente?')) return;
+    const { error } = await sb.rpc('admin_unban_user', { p_uid:id });
+    if (error){ alert(error.message); return; }
+    loadReports(); searchUsers(); loadStats();
+  }
+
+  function esc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>
