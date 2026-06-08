@@ -916,6 +916,17 @@ body::before {
   <div class="spinner"></div>
 </div>
 
+<!-- Overlay bloccante: manutenzione / forza-aggiornamento / account sospeso.
+     Copre TUTTO (anche il login). Gestito da checkAppGate() e dalla verifica banned. -->
+<div id="appGate" style="display:none;position:fixed;inset:0;z-index:99999;background:var(--bg);
+     flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;gap:14px;">
+  <div id="appGateEmoji" style="font-size:52px;">🛠️</div>
+  <div id="appGateTitle" style="font-family:'DM Serif Display',serif;font-size:24px;"></div>
+  <div id="appGateMsg" style="font-size:15px;color:var(--text2);max-width:340px;line-height:1.5;"></div>
+  <button id="appGateBtn" class="btn-primary" style="display:none;max-width:280px;margin-top:8px;"
+     onclick="window.open('https://apps.apple.com/app/livematch','_blank')">Aggiorna l'app</button>
+</div>
+
 <div id="app" style="display:none;">
 
   <!-- POPUP CHAT MENU -->
@@ -1325,7 +1336,7 @@ body::before {
       <div class="chat-av" id="chatAv"></div>
       <div class="chat-info">
         <div class="chat-name" id="chatName">—</div>
-        <div class="chat-status">● Online ora</div>
+        <div class="chat-status" id="chatStatus" style="color:var(--text2)">●&nbsp;Offline</div>
       </div>
     </div>
     <div class="messages-area" id="messages">
@@ -1823,6 +1834,9 @@ window._loadingFallback = setTimeout(function() {
 // IMPORTANTE: URL deve essere SOLO "https://XXXX.supabase.co"
 //             senza /rest/v1/ o altri path finali!
 // ============================================================
+// ⚠️ AGGIORNARE A OGNI BUILD: deve combaciare con CURRENT_PROJECT_VERSION dell'app iOS.
+// Usato dal "forza aggiornamento" dell'admin (se APP_BUILD < min_build → schermata Aggiorna).
+const APP_BUILD = 5;
 const SUPABASE_URL = 'https://dmzozvidylvdaclzyeqk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtem96dmlkeWx2ZGFjbHp5ZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzgyODQsImV4cCI6MjA5NTQxNDI4NH0.dmdHfeoXrPHCpFzOMxoVo8TtTuj1M9KRPnOUWRMn2sE';
 
@@ -2638,7 +2652,10 @@ async function loadChatList() {
       ? `<img src="${safeUrl(other.avatar_url)}" alt="${escapeHtml(other.name)}"/>`
       : escapeHtml((other.name || '?')[0].toUpperCase());
 
-    const onlineDot = other.is_online ? '<div class="chat-list-online"></div>' : '';
+    // Online = visto negli ultimi 90s (recency reale, non il booleano is_online che
+    // resta "true fantasma" se l'app viene chiusa/uccisa senza eseguire setOffline).
+    const _ls = other.last_seen ? new Date(other.last_seen).getTime() : 0;
+    const onlineDot = (_ls && (Date.now() - _ls) < 90000) ? '<div class="chat-list-online"></div>' : '';
 
     item.innerHTML = `
       <div class="chat-list-av">${avHtml}${onlineDot}</div>
@@ -2723,7 +2740,43 @@ function withTimeout(promise, ms) {
   ]);
 }
 
+function showAppGate(emoji, title, msg, showBtn) {
+  document.getElementById('appGateEmoji').textContent = emoji;
+  document.getElementById('appGateTitle').textContent = title;
+  document.getElementById('appGateMsg').textContent = msg;
+  document.getElementById('appGateBtn').style.display = showBtn ? '' : 'none';
+  document.getElementById('appGate').style.display = 'flex';
+  const ld = document.getElementById('loading'); if (ld) ld.style.display = 'none';
+}
+
+// Ritorna true se l'app deve restare BLOCCATA (manutenzione o aggiornamento forzato).
+// Letta da app_config (pubblica). Se irraggiungibile, NON blocca (fail-open).
+async function checkAppGate() {
+  try {
+    const { data } = await withTimeout(sb.from('app_config')
+      .select('maintenance,maintenance_title,maintenance_msg,min_build,update_title,update_msg')
+      .eq('id', 1).maybeSingle(), 5000);
+    if (!data) return false;
+    if (data.maintenance) {
+      showAppGate('🛠️', data.maintenance_title || 'App in aggiornamento',
+        data.maintenance_msg || 'Torna tra poco!', false);
+      return true;
+    }
+    if (data.min_build && APP_BUILD < data.min_build) {
+      showAppGate('🚀', data.update_title || 'Aggiorna LiveMatch',
+        data.update_msg || 'È disponibile una nuova versione.', true);
+      return true;
+    }
+  } catch (_) { /* config non raggiungibile → non bloccare */ }
+  return false;
+}
+
 async function init() {
+  // Gate manutenzione/aggiornamento PRIMA di tutto.
+  if (await checkAppGate()) {
+    const ld = document.getElementById('loading'); if (ld) ld.style.display = 'none';
+    return;
+  }
   try {
     const { data: { session } } = await withTimeout(sb.auth.getSession(), 6000);
     if (session) {
@@ -3056,6 +3109,14 @@ async function loadProfile() {
     await new Promise(r => setTimeout(r, 600));
   }
   currentProfile = data;
+  // Account sospeso/bannato dall'admin → blocca l'app e disconnetti.
+  if (data && data.banned) {
+    showAppGate('🚫', 'Account sospeso',
+      data.banned_reason ? ('Motivo: ' + data.banned_reason)
+                         : 'Il tuo account è stato sospeso per violazione delle regole della community.', false);
+    try { await sb.auth.signOut(); } catch (_) {}
+    return;
+  }
   await loadPlan();
   if (data) renderProfileScreen(data);
   await loadOnlineCount();
@@ -4457,6 +4518,12 @@ function loadChatScreen() {
   }
   const nameEl = document.getElementById('chatName');
   if (nameEl) nameEl.textContent = matchedProfile.name + ', ' + matchedProfile.age;
+
+  // ✅ Stato online REALE dell'altro utente (basato su last_seen, non su un testo
+  // fisso): "Online ora" solo se visto negli ultimi 90s, altrimenti "Offline".
+  updateChatStatus();
+  if (window._chatStatusPoller) clearInterval(window._chatStatusPoller);
+  window._chatStatusPoller = setInterval(updateChatStatus, 30000);
   // ✅ FIX: NON toccare #chatSysMsg qui. Vive DENTRO #messages e viene rimosso
   // dal msgs.innerHTML='' qui sotto; alla 2ª chiamata di loadChatScreen (es.
   // switch alla chat canonica nel 2° match) sarebbe null → eccezione → il
@@ -4470,6 +4537,23 @@ function loadChatScreen() {
     sys.textContent = 'Match live con ' + matchedProfile.name + '!';
     msgs.appendChild(sys);
   }
+}
+
+// Aggiorna l'indicatore "Online ora / Offline" in cima alla chat leggendo il
+// last_seen reale dell'altro utente da profiles_public. Online SOLO se l'altro
+// è stato visto negli ultimi 90s (cioè è dentro l'app); appena chiude l'app, il
+// suo last_seen smette di aggiornarsi e qui passa a "Offline".
+async function updateChatStatus() {
+  const el = document.getElementById('chatStatus');
+  if (!el || !matchedProfile) return;
+  try {
+    const { data } = await sb.from('profiles_public')
+      .select('last_seen').eq('id', matchedProfile.id).maybeSingle();
+    const ls = (data && data.last_seen) ? new Date(data.last_seen).getTime() : 0;
+    const online = ls && (Date.now() - ls) < 90000;
+    if (online) { el.innerHTML = '●&nbsp;Online ora'; el.style.color = 'var(--green)'; }
+    else        { el.innerHTML = '●&nbsp;Offline';    el.style.color = 'var(--text2)'; }
+  } catch (_) { /* rete: lascia lo stato precedente */ }
 }
 
 async function subscribeToMessages() {
@@ -4845,6 +4929,51 @@ function handleChatInput() {
   // noop - rimosso broadcast
 }
 
+// ✅ Termina il flusso match per QUESTO utente in QUALSIASI fase (live match, foto,
+//    review foto, attesa risposta, accettato). Pulisce timer/poller, azzera lo stato
+//    e mostra il popup. Serve a garantire che, se UNO rifiuta o il match scade, il
+//    flusso si interrompa come "match fallito" anche per l'ALTRO utente — non può
+//    andare avanti per uno solo dei due.
+function endMatchFlow(status) {
+  const active = document.querySelector('.screen.active');
+  // Una chat già attiva = match realmente accettato: non interromperla.
+  if (active && active.id === 's-chat') return;
+  // Pulisci tutti i timer/poller del flusso match.
+  stopMatchTimer();
+  if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
+  if (window._matchPoller) { clearInterval(window._matchPoller); window._matchPoller = null; }
+  if (window._photoPoller) { clearInterval(window._photoPoller); window._photoPoller = null; }
+  if (window._photoReviewTimer) { clearInterval(window._photoReviewTimer); window._photoReviewTimer = null; }
+  try { if (typeof dismissToast === 'function') dismissToast(); } catch (_) {}
+  currentMatch = null; matchedProfile = null; incomingPhotoReq = false;
+  // Mostra il popup "match fallito/scaduto" solo se sono su una schermata di match.
+  const phases = ['s-match', 's-photo', 's-photo-review', 's-waiting-response', 's-accepted'];
+  if (active && phases.includes(active.id)) {
+    if (status === 'expired') document.getElementById('popupExpired').classList.add('show');
+    else document.getElementById('popupReject').classList.add('show');
+  }
+}
+
+// ✅ Guardiano globale del match: ogni 3s, se c'è un match attivo e sono in una sua
+//    fase (NON in chat), controlla lo stato sul DB. Se l'altro ha rifiutato o il
+//    match è scaduto, interrompe il flusso per me. È il backstop affidabile che
+//    copre TUTTE le fasi e funziona sia che io abbia iniziato il match sia no
+//    (i filtri Realtime da soli non coprivano il caso "to_user").
+function startMatchGuardLoop() {
+  if (window._matchGuard) return;
+  window._matchGuard = setInterval(async () => {
+    if (!currentMatch || !currentMatch.id) return;
+    const active = document.querySelector('.screen.active');
+    const phases = ['s-match', 's-photo', 's-photo-review', 's-waiting-response', 's-accepted'];
+    if (!active || !phases.includes(active.id)) return;
+    try {
+      const { data: mr } = await sb.from('match_requests')
+        .select('status').eq('id', currentMatch.id).maybeSingle();
+      if (mr && (mr.status === 'rejected' || mr.status === 'expired')) endMatchFlow(mr.status);
+    } catch (_) {}
+  }, 3000);
+}
+
 async function subscribeToMatches() {
   if (!currentProfile) return;
 
@@ -4907,12 +5036,22 @@ async function subscribeToMatches() {
           }
           showAcceptedScreen();
         }
-      } else if (req.status === 'rejected') {
-        if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
-        currentMatch = null;
-        matchedProfile = null;
-        document.getElementById('popupReject').classList.add('show');
+      } else if (req.status === 'rejected' || req.status === 'expired') {
+        endMatchFlow(req.status);
       }
+    })
+    // ✅ Caso speculare: sono io il DESTINATARIO (to_user) e l'altro (che ha iniziato
+    //    il match) lo annulla/rifiuta, o il match scade. Senza questo listener restavo
+    //    bloccato nella mia fase (foto/review/attesa) mentre per l'altro era finito.
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'match_requests',
+      filter: `to_user=eq.${currentProfile.id}`
+    }, (payload) => {
+      const req = payload.new;
+      if (!req || !currentMatch || currentMatch.id !== req.id) return;
+      if (req.status === 'rejected' || req.status === 'expired') endMatchFlow(req.status);
     })
     .subscribe();
 
@@ -5018,6 +5157,9 @@ async function subscribeToMatches() {
       }
     })
     .subscribe();
+
+  // ✅ Avvia il guardiano globale del match (backstop affidabile in ogni fase).
+  startMatchGuardLoop();
 }
 
 // Mostra "Tempo scaduto" SOLO se non sei già in una chat attiva (match accettato).
@@ -5031,6 +5173,7 @@ function showExpiredPopup() {
 function leaveChat() {
   if (msgChannel) { sb.removeChannel(msgChannel); msgChannel = null; }
   if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
+  if (window._chatStatusPoller) { clearInterval(window._chatStatusPoller); window._chatStatusPoller = null; }
   if (window._photoPoller) { clearInterval(window._photoPoller); window._photoPoller = null; }
   if (window._matchPoller) { clearInterval(window._matchPoller); window._matchPoller = null; }
   // ✅ Azzera anche il timer di attesa-risposta: se restava attivo, scattava un
