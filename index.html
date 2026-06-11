@@ -456,7 +456,13 @@ body::before {
 }
 .nav-item:hover{background:var(--surface2);}
 .nav-item.active{color:var(--accent);}
-.nav-item .icon{font-size:20px;}
+.nav-item .icon{font-size:20px;position:relative;}
+.nav-item .nav-badge{
+  position:absolute;top:-5px;right:-11px;min-width:16px;height:16px;border-radius:8px;
+  background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:0 4px;
+  display:flex;align-items:center;justify-content:center;line-height:1;
+  border:1.5px solid var(--bg);box-sizing:border-box;
+}
 
 
 /* ---- CHAT LIST ---- */
@@ -467,11 +473,19 @@ body::before {
 .chats-title{font-family:'DM Serif Display',serif;font-size:22px;}
 .chats-sub{font-size:13px;color:var(--text2);margin-top:2px;}
 .chat-list{display:flex;flex-direction:column;flex:1;}
+/* Riga con swipe-to-delete: pulsante "Elimina" dietro, item che scorre a sinistra */
+.chat-row{position:relative;overflow:hidden;}
+.chat-row .chat-del{
+  position:absolute;top:0;right:0;bottom:0;width:84px;border:none;
+  background:#d9342b;color:#fff;font-size:13px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
 .chat-list-item{
   display:flex;align-items:center;gap:12px;
   padding:14px 20px;
   border-bottom:0.5px solid var(--border);
   cursor:pointer;transition:background 0.15s;
+  background:var(--bg);position:relative;
 }
 .chat-list-item:hover{background:var(--surface2);}
 .chat-list-av{
@@ -1155,11 +1169,12 @@ body::before {
       <div id="regError" class="error-msg" style="display:none"></div>
 
       <div class="field" style="align-items:center;">
-        <label>FOTO PROFILO</label>
+        <label>FOTO PROFILO <span style="color:var(--accent)">*</span></label>
         <div class="avatar-upload" id="avatarPreview" onclick="document.getElementById('avatarInput').click()">
           <span>📷</span>
           <span style="font-size:11px;color:var(--text3)">Aggiungi</span>
         </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">Obbligatoria — almeno una foto.</div>
         <input type="file" id="avatarInput" accept="image/*" onchange="previewAvatar(event)"/>
       </div>
 
@@ -1911,7 +1926,7 @@ window._loadingFallback = setTimeout(function() {
 // ============================================================
 // ⚠️ AGGIORNARE A OGNI BUILD: deve combaciare con CURRENT_PROJECT_VERSION dell'app iOS.
 // Usato dal "forza aggiornamento" dell'admin (se APP_BUILD < min_build → schermata Aggiorna).
-const APP_BUILD = 7;
+const APP_BUILD = 8;
 const SUPABASE_URL = 'https://dmzozvidylvdaclzyeqk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtem96dmlkeWx2ZGFjbHp5ZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzgyODQsImV4cCI6MjA5NTQxNDI4NH0.dmdHfeoXrPHCpFzOMxoVo8TtTuj1M9KRPnOUWRMn2sE';
 
@@ -2051,6 +2066,7 @@ async function loadPlan() {
         currentProfile.daily_limit = data.daily_limit;
         currentProfile.referral_code = data.referral_code;
       }
+      updateMatchLimitBadge(); // ricalcola "match rimanenti oggi" col nuovo limite del piano
     }
   } catch (e) { console.error('[LiveMatch] loadPlan', e); }
 }
@@ -2106,24 +2122,31 @@ async function copyInvite() {
 
 // Pre-controllo lato CLIENT (solo UX/anticipo). L'enforcement VERO è server-side
 // in consume_match() (vedi acceptMatch): il client non scrive più daily_matches.
+// Badge "X match rimanenti oggi" sulla home (sopra il cuore live). Compare DOPO il primo
+// match della giornata (used >= 1) e mostra: rimanenti = limite del piano − match usati oggi.
+// Si ricalcola da solo quando cambia il piano (currentDailyLimit riflette planState).
+function updateMatchLimitBadge() {
+  const badge = document.getElementById('limitBadge');
+  if (!badge || !currentProfile) return;
+  const today = new Date().toISOString().split('T')[0];
+  const LIM = currentDailyLimit();
+  const used = (currentProfile.last_match_date === today) ? (currentProfile.daily_matches || 0) : 0;
+  const remaining = LIM - used;
+  if (isUnlimited() || used < 1) {
+    badge.style.display = 'none'; // illimitato oppure ancora nessun match oggi → niente badge
+  } else {
+    badge.style.display = 'block';
+    badge.textContent = remaining > 0 ? (remaining + ' match rimanenti oggi') : 'Limite giornaliero raggiunto';
+  }
+}
+
 function checkDailyLimit() {
   if (!currentProfile) return true;
   const today = new Date().toISOString().split('T')[0];
   // Conteggio effettivo: se l'ultimo match è di un altro giorno, oggi è 0 (reset gestito dal server)
   const LIM = currentDailyLimit();
   const used = (currentProfile.last_match_date === today) ? (currentProfile.daily_matches || 0) : 0;
-  const remaining = LIM - used;
-  const badge = document.getElementById('limitBadge');
-  if (badge) {
-    if (isUnlimited()) {
-      badge.style.display = 'none';
-    } else if (remaining <= 3) {
-      badge.style.display = 'block';
-      badge.textContent = remaining > 0 ? remaining + ' match rimanenti oggi' : 'Limite giornaliero raggiunto';
-    } else {
-      badge.style.display = 'none';
-    }
-  }
+  updateMatchLimitBadge();
 
   if (!isUnlimited() && used >= LIM) {
     const sub = document.getElementById('dailyLimitSub');
@@ -2660,6 +2683,9 @@ function navTo(screen) {
     const onclick = item.getAttribute('onclick') || '';
     if (onclick.includes("'" + screen + "'")) item.classList.add('active');
   });
+  if (screen === 'waiting') {
+    updateMatchLimitBadge(); // aggiorna "X match rimanenti oggi" sopra il cuore
+  }
   if (screen === 'plus') {
     loadPlusScreen();                 // mostra subito lo stato noto
     loadPlan().then(loadPlusScreen);  // poi aggiorna dal server
@@ -2700,6 +2726,52 @@ function markChatRead(chatId) {
   if (!chatId) return;
   const r = _getChatReads(); r[chatId] = new Date().toISOString();
   try { localStorage.setItem('lm_chatReads', JSON.stringify(r)); } catch (_) {}
+  refreshChatNavBadge(); // aggiorna il badge "Chat" nel menu in basso
+}
+
+// Badge sul menu in basso (voce "Chat"): NUMERO DI CHAT con messaggi non letti (non il
+// totale dei messaggi). Aggiorna tutte le bottom-nav (una per schermata).
+function updateChatNavBadge(count) {
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const oc = item.getAttribute('onclick') || '';
+    if (!oc.includes("'chats'")) return;
+    let badge = item.querySelector('.nav-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'nav-badge';
+        (item.querySelector('.icon') || item).appendChild(badge);
+      }
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.style.display = '';
+    } else if (badge) {
+      badge.style.display = 'none';
+    }
+  });
+}
+
+// Conta le chat con almeno un messaggio non letto e aggiorna il badge del menu.
+let _navBadgeBusy = false;
+async function refreshChatNavBadge() {
+  if (!currentProfile || _navBadgeBusy) return;
+  _navBadgeBusy = true;
+  try {
+    const { data: matches } = await sb.from('match_requests')
+      .select('id').or('from_user.eq.' + currentProfile.id + ',to_user.eq.' + currentProfile.id)
+      .eq('status', 'accepted');
+    if (!matches || !matches.length) { updateChatNavBadge(0); return; }
+    const chatIds = matches.map(m => m.id);
+    const { data: msgs } = await sb.from('messages')
+      .select('chat_id, sender_id, created_at').in('chat_id', chatIds);
+    const reads = _getChatReads();
+    const unreadChats = new Set();
+    (msgs || []).forEach(m => {
+      if (m.sender_id === currentProfile.id) return;
+      const lr = reads[m.chat_id] ? new Date(reads[m.chat_id]).getTime() : 0;
+      if (new Date(m.created_at).getTime() > lr) unreadChats.add(m.chat_id);
+    });
+    updateChatNavBadge(unreadChats.size);
+  } catch (_) {} finally { _navBadgeBusy = false; }
 }
 
 async function loadChatList() {
@@ -2753,12 +2825,15 @@ async function loadChatList() {
   // Conta i messaggi NON letti per chat: messaggi dell'altro utente arrivati dopo
   // l'ultima volta che ho aperto quella chat (stato in localStorage).
   const _reads = _getChatReads();
+  const _hidden = _getHiddenChats();
   const unreadByChat = {};
   (msgRes.data || []).forEach(m => {
     if (m.type === 'system' || m.sender_id === currentProfile.id) return;
     const lr = _reads[m.chat_id] ? new Date(_reads[m.chat_id]).getTime() : 0;
     if (new Date(m.created_at).getTime() > lr) unreadByChat[m.chat_id] = (unreadByChat[m.chat_id] || 0) + 1;
   });
+  // Badge menu "Chat" = numero di CHAT con non letti (chiavi di unreadByChat).
+  updateChatNavBadge(Object.keys(unreadByChat).length);
 
   list.innerHTML = '';
   const frag = document.createDocumentFragment();
@@ -2774,6 +2849,14 @@ async function loadChatList() {
     const timeStr = lastMsg
       ? formatTime(new Date(lastMsg.created_at))
       : formatTime(new Date(match.created_at));
+
+    // Chat nascosta (eliminata "solo per me"): salta, A MENO che sia arrivato un
+    // messaggio NUOVO dopo l'occultamento (allora riappare).
+    const hideAt = _hidden[match.id] ? new Date(_hidden[match.id]).getTime() : 0;
+    if (hideAt) {
+      const lastMs = lastMsg ? new Date(lastMsg.created_at).getTime() : new Date(match.created_at).getTime();
+      if (lastMs <= hideAt) continue;
+    }
 
     const itemId = match.id;
     _chatListItems.set(itemId, { match, other });
@@ -2808,9 +2891,70 @@ async function loadChatList() {
       </div>
     `;
     item.onclick = () => openChatFromList(match, other);
-    frag.appendChild(item);
+    // Riga con swipe-to-delete: pulsante "Elimina" dietro + item scorrevole
+    const row = document.createElement('div');
+    row.className = 'chat-row';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'chat-del';
+    delBtn.textContent = 'Elimina';
+    delBtn.onclick = (e) => { e.stopPropagation(); hideChat(itemId, row); };
+    row.appendChild(delBtn);
+    row.appendChild(item);
+    attachSwipeDelete(item);
+    frag.appendChild(row);
   }
   list.appendChild(frag);
+}
+
+// localStorage delle chat nascoste "solo per me" { chatId: ISO-occultamento }
+function _getHiddenChats() { try { return JSON.parse(localStorage.getItem('lm_hiddenChats') || '{}'); } catch (_) { return {}; } }
+function hideChat(chatId, rowEl) {
+  if (!chatId) return;
+  try {
+    const h = _getHiddenChats(); h[chatId] = new Date().toISOString();
+    localStorage.setItem('lm_hiddenChats', JSON.stringify(h));
+  } catch (_) {}
+  markChatRead(chatId); // così non resta conteggiata come non letta (e aggiorna il badge menu)
+  if (rowEl) {
+    rowEl.style.height = rowEl.offsetHeight + 'px';
+    rowEl.style.transition = 'height .2s ease, opacity .2s ease';
+    requestAnimationFrame(() => { rowEl.style.height = '0'; rowEl.style.opacity = '0'; });
+    setTimeout(() => { try { rowEl.remove(); } catch (_) {} }, 220);
+  }
+}
+
+// Swipe a sinistra sull'item per rivelare il pulsante "Elimina" (stile iOS).
+function attachSwipeDelete(item) {
+  const W = 84;
+  let sx = 0, sy = 0, dragging = false, moved = false, open = false;
+  const setX = (x) => { item.style.transform = 'translateX(' + x + 'px)'; };
+  item.addEventListener('touchstart', (e) => {
+    const t = e.touches[0]; sx = t.clientX; sy = t.clientY; dragging = true; moved = false;
+    item.style.transition = 'none';
+  }, { passive: true });
+  item.addEventListener('touchmove', (e) => {
+    if (!dragging) return;
+    const t = e.touches[0]; const dx = t.clientX - sx; const dy = t.clientY - sy;
+    if (!moved && Math.abs(dy) > Math.abs(dx)) { dragging = false; return; } // scroll verticale
+    if (Math.abs(dx) > 6) moved = true;
+    const x = Math.max(-W, Math.min(0, (open ? -W : 0) + dx));
+    setX(x);
+  }, { passive: true });
+  item.addEventListener('touchend', () => {
+    if (!dragging) return; dragging = false;
+    item.style.transition = 'transform .2s ease';
+    const cur = parseFloat((item.style.transform.match(/-?[\d.]+/) || [0])[0]) || 0;
+    open = cur < -W / 2;
+    setX(open ? -W : 0);
+    if (moved) { item._suppressClick = true; setTimeout(() => { item._suppressClick = false; }, 350); }
+  });
+  // Se aperto o swipe appena fatto → il tap NON apre la chat (e chiude la riga).
+  item.addEventListener('click', (e) => {
+    if (item._suppressClick || open) {
+      e.stopImmediatePropagation();
+      if (open) { item.style.transition = 'transform .2s ease'; setX(0); open = false; }
+    }
+  }, true);
 }
 
 function formatTime(date) {
@@ -3121,6 +3265,7 @@ async function doRegister() {
   if (!orientation) missing.push('Orientamento');
   if (!email) missing.push('Email');
   if (!pwd) missing.push('Password');
+  if (!avatarFileToUpload) missing.push('Foto profilo'); // ✅ almeno una foto obbligatoria
   if (missing.length) {
     err.textContent = 'Compila: ' + missing.join(', ') + '.'; err.style.display = 'block'; return;
   }
@@ -3594,6 +3739,7 @@ async function setupOnlinePresence() {
   // Push notifications (no-op su web)
   setupPushNotifications();
   resetBadge();
+  refreshChatNavBadge(); // badge "Chat" nel menu
 
   // Imposta subito last_seen e is_online
   await sb.from('profiles')
@@ -3611,7 +3757,7 @@ async function setupOnlinePresence() {
   // di continuo → query eccessive e numero che sfarfallava.)
   await loadOnlineCount();
   if (window._onlinePoller) clearInterval(window._onlinePoller);
-  window._onlinePoller = setInterval(loadOnlineCount, 30000);
+  window._onlinePoller = setInterval(() => { loadOnlineCount(); refreshChatNavBadge(); }, 30000);
 
   // (Posizione = provincia scelta nel profilo; nessun GPS da richiedere)
 
@@ -3646,6 +3792,7 @@ function handleVisibility() {
       .then(() => loadOnlineCount());
     startHeartbeat();
     resetBadge(); // foreground → azzera il contatore notifiche
+    refreshChatNavBadge(); // aggiorna il badge "Chat" del menu
     // Ri-registra/aggiorna il token push: garantisce notifiche affidabili (#4)
     setupPushNotifications();
   }
@@ -4359,7 +4506,7 @@ function showAcceptedScreen() {
   // dal trigger tg_charge_match_on_accept; l'altro resta invariato).
   if (currentProfile) {
     sb.from('profiles').select('daily_matches,last_match_date').eq('id', currentProfile.id).maybeSingle()
-      .then(({ data }) => { if (data) { currentProfile.daily_matches = data.daily_matches; currentProfile.last_match_date = data.last_match_date; } }, () => {});
+      .then(({ data }) => { if (data) { currentProfile.daily_matches = data.daily_matches; currentProfile.last_match_date = data.last_match_date; updateMatchLimitBadge(); } }, () => {});
   }
   // Avatar mio
   const meAv = document.getElementById('acceptedAvMe');
@@ -5395,10 +5542,17 @@ async function subscribeToMatches() {
       if (!fromProfile) return;
       const { data: matchData } = await sb.from('match_requests')
         .select('*').eq('id', req.match_id).single();
-      if (!currentMatch && matchData) currentMatch = matchData;
-      if (!matchedProfile) matchedProfile = fromProfile;
-      // Mostra toast a B per scattare la foto
-      showToast({ profile: fromProfile, type: 'photo', matchData: matchData || currentMatch });
+      if (matchData) currentMatch = matchData;
+      matchedProfile = fromProfile;
+      // ✅ Se sono io l'INIZIATORE del match (ho già avviato io la richiesta), il flusso è
+      //    già in corso → NIENTE popup: vado DIRETTO a scattare la foto (come l'altro). Se non
+      //    voglio proseguire, "Annulla match". Il popup di richiesta resta solo per il PRIMO
+      //    contatto (chi riceve la richiesta iniziale = to_user del match).
+      if (matchData && matchData.from_user === currentProfile.id) {
+        handleMyMatchPhotoRequested();
+      } else {
+        showToast({ profile: fromProfile, type: 'photo', matchData: matchData || currentMatch });
+      }
     })
     .subscribe();
 
