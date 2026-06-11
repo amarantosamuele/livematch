@@ -824,19 +824,44 @@ body::before {
 #userProfileModal{
   position:fixed;inset:0;z-index:9000;background:var(--bg);display:none;
   flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding:max(14px,env(safe-area-inset-top)) 18px calc(34px + env(safe-area-inset-bottom));
 }
 #userProfileModal.show{display:flex;}
+#userProfileModal .up-top{
+  position:sticky;top:0;z-index:2;padding:max(12px,env(safe-area-inset-top)) 16px 8px;
+  background:linear-gradient(var(--bg) 65%, transparent);
+}
 #userProfileModal .up-back{
-  align-self:flex-start;background:none;border:none;color:var(--text2);
-  font-size:16px;cursor:pointer;padding:6px 0 2px;
+  background:var(--surface2);border:0.5px solid var(--border);color:var(--text);
+  font-size:14px;font-weight:500;cursor:pointer;padding:8px 14px;border-radius:20px;
 }
 #userProfileModal .up-card{
-  max-width:460px;margin:6px auto 0;width:100%;
-  display:flex;flex-direction:column;align-items:center;gap:12px;
+  max-width:480px;margin:0 auto;width:100%;
+  padding:0 16px calc(40px + env(safe-area-inset-bottom));
 }
-#userProfileModal .up-meta{font-size:13px;color:var(--text2);text-align:center;}
-#userProfileModal .up-bio{font-size:14px;color:var(--text);text-align:center;line-height:1.55;white-space:pre-wrap;}
+#userProfileModal .up-hero{
+  position:relative;width:100%;aspect-ratio:4/5;border-radius:20px;overflow:hidden;
+  background:var(--surface2);
+}
+#userProfileModal .up-hero img{width:100%;height:100%;object-fit:cover;cursor:zoom-in;}
+#userProfileModal .up-noimg{width:100%;height:100%;display:flex;align-items:center;
+  justify-content:center;font-family:'DM Serif Display',serif;font-size:72px;color:#fff;background:var(--accent);}
+#userProfileModal .up-overlay{
+  position:absolute;left:0;right:0;bottom:0;padding:26px 18px 14px;color:#fff;
+  background:linear-gradient(transparent, rgba(0,0,0,0.78));pointer-events:none;
+}
+#userProfileModal .up-hname{font-family:'DM Serif Display',serif;font-size:26px;line-height:1.1;}
+#userProfileModal .up-meta{font-size:13px;opacity:.95;margin-top:5px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+#userProfileModal .up-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;box-shadow:0 0 0 2px rgba(255,255,255,.25);}
+#userProfileModal .up-gallery{display:flex;gap:8px;margin-top:10px;}
+#userProfileModal .up-gallery .gthumb{flex:1;max-width:130px;aspect-ratio:1;border-radius:12px;overflow:hidden;cursor:zoom-in;background:var(--surface2);}
+#userProfileModal .up-gallery .gthumb img{width:100%;height:100%;object-fit:cover;}
+#userProfileModal .up-sec{margin-top:20px;}
+#userProfileModal .up-label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--text2);margin-bottom:7px;}
+#userProfileModal .up-bio{font-size:14.5px;color:var(--text);line-height:1.6;white-space:pre-wrap;}
+#userProfileModal .up-why{background:var(--surface);border:0.5px solid var(--border);border-radius:14px;
+  padding:14px 16px;font-size:14px;color:var(--text);line-height:1.55;font-style:italic;}
+#userProfileModal .up-audiocard{background:var(--surface);border:0.5px solid var(--border);border-radius:14px;padding:12px 14px;}
+#userProfileModal .up-audiocard audio{width:100%;margin-top:8px;}
 
 /* ---- AUDIO: recorder + player ---- */
 .audio-rec{display:flex;flex-direction:column;gap:8px;}
@@ -929,17 +954,30 @@ body::before {
 
 <!-- Modale profilo utente (apribile dal nome in chat) -->
 <div id="userProfileModal">
-  <button class="up-back" onclick="closeUserProfileModal()">← Indietro</button>
+  <div class="up-top"><button class="up-back" onclick="closeUserProfileModal()">← Indietro</button></div>
   <div class="up-card">
-    <div class="big-avatar" id="upAvatar"></div>
-    <div class="profile-name" id="upName">—</div>
-    <div class="up-meta" id="upMeta"></div>
-    <div class="up-bio" id="upBio"></div>
-    <div class="profile-why" id="upWhy" style="display:none"></div>
-    <div class="profile-gallery" id="upGallery" style="display:none"></div>
-    <div class="profile-audio" id="upAudio" style="display:none">
-      <div class="pa-q" id="upAudioQ"></div>
-      <audio id="upAudioPlayer" controls preload="none"></audio>
+    <div class="up-hero">
+      <div id="upHero"></div>
+      <div class="up-overlay">
+        <div class="up-hname" id="upName">—</div>
+        <div class="up-meta" id="upMeta"></div>
+      </div>
+    </div>
+    <div class="up-gallery" id="upGallery" style="display:none"></div>
+    <div class="up-sec" id="upBioSec" style="display:none">
+      <div class="up-label">Bio</div>
+      <div class="up-bio" id="upBio"></div>
+    </div>
+    <div class="up-sec" id="upWhySec" style="display:none">
+      <div class="up-label">Perché uscire con me</div>
+      <div class="up-why" id="upWhy"></div>
+    </div>
+    <div class="up-sec" id="upAudioSec" style="display:none">
+      <div class="up-label">La sua voce</div>
+      <div class="up-audiocard">
+        <div id="upAudioQ" style="font-size:13px;color:var(--text2);"></div>
+        <audio id="upAudioPlayer" controls preload="none"></audio>
+      </div>
     </div>
   </div>
 </div>
@@ -1331,7 +1369,7 @@ body::before {
   <!-- ===== PHOTO REQUEST ===== -->
   <div class="screen" id="s-photo">
     <div class="topbar" style="border-bottom:0.5px solid var(--border);">
-      <button onclick="leavePhotoScreen()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">←</button>
+      <div style="width:24px"></div>
       <div style="font-size:14px;font-weight:500;">Foto dal vivo</div>
       <div style="width:24px"></div>
     </div>
@@ -1359,6 +1397,9 @@ body::before {
       </div>
       <button class="btn-primary" id="btnSendPhoto" style="display:none" onclick="sendLivePhoto()">
         Invia foto e vai alla chat →
+      </button>
+      <button onclick="cancelMatchFromPhoto()" style="margin-top:10px;width:100%;padding:13px;border:none;border-radius:12px;background:#d9342b;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">
+        Annulla match
       </button>
     </div>
   </div>
@@ -1870,7 +1911,7 @@ window._loadingFallback = setTimeout(function() {
 // ============================================================
 // ⚠️ AGGIORNARE A OGNI BUILD: deve combaciare con CURRENT_PROJECT_VERSION dell'app iOS.
 // Usato dal "forza aggiornamento" dell'admin (se APP_BUILD < min_build → schermata Aggiorna).
-const APP_BUILD = 6;
+const APP_BUILD = 7;
 const SUPABASE_URL = 'https://dmzozvidylvdaclzyeqk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtem96dmlkeWx2ZGFjbHp5ZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzgyODQsImV4cCI6MjA5NTQxNDI4NH0.dmdHfeoXrPHCpFzOMxoVo8TtTuj1M9KRPnOUWRMn2sE';
 
@@ -1890,7 +1931,11 @@ let incomingPhotoReq = false;   // true quando vedo il profilo di chi mi ha chie
 let matchTimer = null;
 let photoTimer = null;
 let photoSecs = 60;
+let photoDeadlineMs = 0; // scadenza CONDIVISA dello scambio foto (created_at photo_request + 60s)
 let matchSecs = 30;
+let matchDeadlineMs = 0;  // scadenza CONDIVISA decisione/attesa match (created_at match_request + durata)
+let matchTotalSecs = 30;  // durata totale del timer corrente (per la UI del cerchio)
+let reviewDeadlineMs = 0; // scadenza CONDIVISA revisione foto
 let photoCapturedFile = null;
 let realtimeChannel = null;
 let photoReqChannel = null;
@@ -2299,6 +2344,11 @@ function toastViewProfile() {
   matchedProfile = profile;
   // Se è una richiesta di foto, il profilo mostra solo "Accetta con foto" / "Rifiuta"
   incomingPhotoReq = (type === 'photo');
+  // Decisione su una richiesta di MATCH in arrivo → scadenza CONDIVISA (35s dal created_at
+  // della richiesta), così il mio timer e l'attesa di chi me l'ha mandata sono allineati.
+  if (type === 'match' && matchData && matchData.created_at) {
+    matchDeadlineMs = new Date(matchData.created_at).getTime() + 35000; matchTotalSecs = 35;
+  } else { matchDeadlineMs = 0; }
   renderMatchScreen(profile);
   goTo('match');
   startMatchTimer();
@@ -2321,19 +2371,15 @@ function toastAccept() {
 
 function toastReject() {
   if (!toastMatchData) return;
-  searchGen++; // ferma una eventuale ricerca in volo (vedi toastViewProfile)
   const { matchData } = toastMatchData;
-  currentMatch = matchData;
-  matchedProfile = null;
   dismissToast();
-  // B rifiuta → aggiorna status nel DB e torna in attesa
-  sb.from('match_requests')
-    .update({ status: 'rejected' })
-    .eq('id', currentMatch.id)
-    .then(() => {
-      currentMatch = null;
-      goTo('waiting');
-    });
+  // Rifiuta la richiesta nel DB (chi l'ha mandata riceve "Match rifiutato").
+  // ⚠️ NON tocca currentMatch / matchedProfile / searchGen / navigazione: così, se stavi
+  //    cercando, CONTINUI a cercare e il toast semplicemente sparisce. Solo "Vedi profilo",
+  //    "Accetta" e "Scatta foto" entrano nel match e fermano la ricerca.
+  if (matchData && matchData.id) {
+    sb.from('match_requests').update({ status: 'rejected' }).eq('id', matchData.id).then(() => {}, () => {});
+  }
 }
 
 function toastSendPhoto() {
@@ -2353,6 +2399,34 @@ function acceptIncomingPhoto() {
   stopMatchTimer();
   incomingPhotoReq = false;
   if (!matchedProfile) { goTo('waiting'); return; }
+  document.getElementById('photoTitle').textContent = matchedProfile.name + ' ti ha chiesto una foto dal vivo! Scatta anche tu entro 60 secondi.';
+  goTo('photo');
+  startPhotoTimer();
+}
+
+// A aveva chiesto un MATCH a B; B, invece di accettare, ha chiesto una FOTO live (status
+// del match → 'photo_requested'). Senza questa gestione il countdown dell'attesa di A
+// restava attivo e SCADEVA, uccidendo il flusso foto. Qui fermo il countdown e porto A
+// a scattare la sua foto (B sta aspettando la sua).
+async function handleMyMatchPhotoRequested() {
+  if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
+  if (window._matchPoller) { clearInterval(window._matchPoller); window._matchPoller = null; }
+  stopMatchTimer();
+  const active = document.querySelector('.screen.active');
+  // Se sono già nel flusso foto/chat non rifare nulla.
+  if (active && ['s-photo', 's-photo-review', 's-chat', 's-accepted'].includes(active.id)) return;
+  if (!matchedProfile) return; // profilo dell'altro non pronto → ci pensa il toast foto
+  // Scadenza CONDIVISA: se il canale foto non l'ha già impostata, la recupero dal photo_request
+  // (così il mio countdown è allineato a quello dell'altro).
+  if (!(photoDeadlineMs && photoDeadlineMs > Date.now()) && currentMatch) {
+    try {
+      const { data: pr } = await sb.from('photo_requests').select('created_at')
+        .eq('match_id', currentMatch.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (pr && pr.created_at) photoDeadlineMs = new Date(pr.created_at).getTime() + 60000;
+    } catch (_) {}
+  }
+  try { dismissToast(); } catch (_) {}
+  incomingPhotoReq = false;
   document.getElementById('photoTitle').textContent = matchedProfile.name + ' ti ha chiesto una foto dal vivo! Scatta anche tu entro 60 secondi.';
   goTo('photo');
   startPhotoTimer();
@@ -2620,6 +2694,14 @@ function navTo(screen) {
 // Mappa per event delegation: chatItemId → {match, other}
 const _chatListItems = new Map();
 
+// --- Stato "letto/non letto" delle chat (per-dispositivo, localStorage) ---
+function _getChatReads() { try { return JSON.parse(localStorage.getItem('lm_chatReads') || '{}'); } catch (_) { return {}; } }
+function markChatRead(chatId) {
+  if (!chatId) return;
+  const r = _getChatReads(); r[chatId] = new Date().toISOString();
+  try { localStorage.setItem('lm_chatReads', JSON.stringify(r)); } catch (_) {}
+}
+
 async function loadChatList() {
   if (!currentProfile) return;
   const list = document.getElementById('chatList');
@@ -2662,12 +2744,21 @@ async function loadChatList() {
   const chatIds = rows.map(r => r.match.id);
   const [profRes, msgRes] = await Promise.all([
     sb.from('profiles_public').select('*').in('id', otherIds),
-    sb.from('messages').select('chat_id, content, type, created_at').in('chat_id', chatIds).order('created_at', { ascending: false })
+    sb.from('messages').select('chat_id, sender_id, content, type, created_at').in('chat_id', chatIds).order('created_at', { ascending: false })
   ]);
   const profById = {};
   (profRes.data || []).forEach(p => { profById[p.id] = p; });
   const lastByChat = {};
   (msgRes.data || []).forEach(m => { if (!lastByChat[m.chat_id]) lastByChat[m.chat_id] = m; }); // ordinati desc → il 1° è l'ultimo
+  // Conta i messaggi NON letti per chat: messaggi dell'altro utente arrivati dopo
+  // l'ultima volta che ho aperto quella chat (stato in localStorage).
+  const _reads = _getChatReads();
+  const unreadByChat = {};
+  (msgRes.data || []).forEach(m => {
+    if (m.type === 'system' || m.sender_id === currentProfile.id) return;
+    const lr = _reads[m.chat_id] ? new Date(_reads[m.chat_id]).getTime() : 0;
+    if (new Date(m.created_at).getTime() > lr) unreadByChat[m.chat_id] = (unreadByChat[m.chat_id] || 0) + 1;
+  });
 
   list.innerHTML = '';
   const frag = document.createDocumentFragment();
@@ -2699,13 +2790,22 @@ async function loadChatList() {
     const _ls = other.last_seen ? new Date(other.last_seen).getTime() : 0;
     const onlineDot = (_ls && (Date.now() - _ls) < ONLINE_WINDOW_MS) ? '<div class="chat-list-online"></div>' : '';
 
+    // Non letti → nome in grassetto + pallino colorato col numero
+    const unread = unreadByChat[match.id] || 0;
+    const nameStyle = unread > 0 ? 'font-weight:700;color:var(--text);' : '';
+    const prevStyle = unread > 0 ? 'color:var(--text);font-weight:500;' : '';
+    const unreadHtml = unread > 0 ? `<div class="unread-badge">${unread > 99 ? '99+' : unread}</div>` : '';
+
     item.innerHTML = `
       <div class="chat-list-av">${avHtml}${onlineDot}</div>
       <div class="chat-list-info">
-        <div class="chat-list-name">${escapeHtml(other.name)}, ${escapeHtml(other.age)}</div>
-        <div class="chat-list-preview">${escapeHtml(preview)}</div>
+        <div class="chat-list-name" style="${nameStyle}">${escapeHtml(other.name)}, ${escapeHtml(other.age)}</div>
+        <div class="chat-list-preview" style="${prevStyle}">${escapeHtml(preview)}</div>
       </div>
-      <div class="chat-list-time">${escapeHtml(timeStr)}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">
+        <div class="chat-list-time">${escapeHtml(timeStr)}</div>
+        ${unreadHtml}
+      </div>
     `;
     item.onclick = () => openChatFromList(match, other);
     frag.appendChild(item);
@@ -2753,6 +2853,7 @@ async function openChatFromList(match, other) {
   // ✅ FIX: navigazione immediata, PRIMA di ogni await → entra sempre nella chat
   matchedProfile = other;
   currentMatch = match;
+  markChatRead(match.id); // aprendo la chat, azzero i non-letti per quella chat
   try { loadChatScreen(); } catch(e) { console.error('[LiveMatch] loadChatScreen error:', e); }
   goTo('chat');
   try {
@@ -3704,6 +3805,11 @@ async function findMatch() {
 
   // Scegli uno random
   const partner = compatible[Math.floor(Math.random() * compatible.length)];
+  // ✅ Guardia FINALE: se nel frattempo la ricerca è stata annullata (es. è arrivata
+  //    una richiesta di match e siamo tornati in home), NON sovrascrivere lo stato né
+  //    navigare. Senza questa guardia findMatch poteva "rubare" currentMatch/matchedProfile
+  //    alla richiesta in arrivo e portarti sul candidato sbagliato.
+  if (gen !== searchGen) return;
   // ⚠️ NON aggiungere qui a sessionSeenIds: se torni in home senza interagire (niente
   //    accetta/rifiuta) la persona deve poter RICOMPARIRE nelle ricerche successive.
   //    L'esclusione di sessione avviene SOLO quando interagisci (rejectMatch / acceptMatch).
@@ -3711,7 +3817,9 @@ async function findMatch() {
   currentMatch = null; // nessun match nel DB ancora
   incomingPhotoReq = false; // match normale → pulsanti normali
 
-  // Mostra profilo di B ad A con timer 30s per decidere
+  // Mostra profilo di B ad A con timer 30s per decidere (candidato di ricerca = solo io
+  // sto decidendo → timer LOCALE 30s, nessuna scadenza condivisa).
+  matchDeadlineMs = 0;
   renderMatchScreen(partner);
   goTo('match');
   startMatchTimer();
@@ -3810,27 +3918,44 @@ function closeLightbox() {
   document.getElementById('lightboxImg').src = '';
 }
 
-// Modale profilo utente (read-only) — riusa galleria+lightbox e stili profilo.
+// Modale profilo utente (read-only) — scheda profilo: foto grande + stato online +
+// galleria foto (tap per ingrandire) + sezioni Bio / Perché uscire con me / Voce.
 function openUserProfileModal(p) {
   if (!p) return;
-  const av = document.getElementById('upAvatar');
-  if (p.avatar_url) av.innerHTML = `<img src="${safeUrl(p.avatar_url)}" alt="${escapeHtml(p.name||'')}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`;
-  else av.textContent = (p.name || '?')[0].toUpperCase();
+  // Hero (foto principale, tap per ingrandire)
+  const hero = document.getElementById('upHero');
+  if (p.avatar_url) hero.innerHTML = `<img src="${safeUrl(p.avatar_url)}" alt="${escapeHtml(p.name||'')}" onclick="openLightbox('${safeUrl(p.avatar_url)}')"/>`;
+  else hero.innerHTML = `<div class="up-noimg">${escapeHtml((p.name||'?')[0].toUpperCase())}</div>`;
   document.getElementById('upName').textContent = (p.name || '') + (p.age ? (', ' + p.age) : '');
-  document.getElementById('upMeta').textContent = p.city || '';
-  document.getElementById('upBio').textContent = p.bio || '';
-  const why = document.getElementById('upWhy');
-  if (p.why_date_me) { why.textContent = p.why_date_me; why.style.display = 'block'; }
-  else { why.textContent = ''; why.style.display = 'none'; }
+  // Meta: stato online (entro la finestra) + città
+  const ls = p.last_seen ? new Date(p.last_seen).getTime() : 0;
+  const online = ls && (Date.now() - ls) < ONLINE_WINDOW_MS;
+  let metaHtml = '';
+  if (online) metaHtml += '<span class="up-dot"></span> Online ora';
+  if (p.city) metaHtml += (metaHtml ? '<span>·</span> ' : '') + escapeHtml(p.city);
+  document.getElementById('upMeta').innerHTML = metaHtml;
+  // Galleria foto extra (tap per ingrandire)
   const gal = document.getElementById('upGallery');
-  const photos = [p.avatar_url, p.photo2_url, p.photo3_url].filter(Boolean);
-  if (photos.length) {
-    gal.innerHTML = photos.map(u => `<div class="gallery-thumb" onclick="openLightbox('${safeUrl(u)}')"><img src="${safeUrl(u)}" alt="foto"/></div>`).join('');
+  const extra = [p.photo2_url, p.photo3_url].filter(Boolean);
+  if (extra.length) {
+    gal.innerHTML = extra.map(u => `<div class="gthumb" onclick="openLightbox('${safeUrl(u)}')"><img src="${safeUrl(u)}" alt="foto"/></div>`).join('');
     gal.style.display = 'flex';
   } else { gal.innerHTML = ''; gal.style.display = 'none'; }
-  const aWrap = document.getElementById('upAudio'), aPlayer = document.getElementById('upAudioPlayer'), aQ = document.getElementById('upAudioQ');
-  if (p.audio_url) { aQ.textContent = '🎤 ' + (p.audio_question || 'Ascolta la sua risposta'); aPlayer.src = p.audio_url; aWrap.style.display = 'flex'; }
-  else { aPlayer.removeAttribute('src'); aWrap.style.display = 'none'; }
+  // Bio
+  const bioSec = document.getElementById('upBioSec');
+  if (p.bio) { document.getElementById('upBio').textContent = p.bio; bioSec.style.display = ''; }
+  else bioSec.style.display = 'none';
+  // Perché uscire con me
+  const whySec = document.getElementById('upWhySec');
+  if (p.why_date_me) { document.getElementById('upWhy').textContent = p.why_date_me; whySec.style.display = ''; }
+  else whySec.style.display = 'none';
+  // Voce
+  const audioSec = document.getElementById('upAudioSec');
+  const aPlayer = document.getElementById('upAudioPlayer');
+  if (p.audio_url) {
+    document.getElementById('upAudioQ').textContent = '🎤 ' + (p.audio_question || 'Ascolta la sua risposta');
+    aPlayer.src = p.audio_url; audioSec.style.display = '';
+  } else { aPlayer.removeAttribute('src'); audioSec.style.display = 'none'; }
   document.getElementById('userProfileModal').classList.add('show');
 }
 
@@ -3905,19 +4030,29 @@ function renderWaitingResponse(partner) {
   }
   document.getElementById('waitingRespName').textContent = partner.name;
 
-  // Timer 35s
-  let secs = 35;
+  // Timer 35s con scadenza CONDIVISA (allineata alla decisione di chi riceve la richiesta).
+  const _wdeadline = (matchDeadlineMs && matchDeadlineMs > Date.now()) ? matchDeadlineMs : (Date.now() + 35000);
+  const _wremaining = () => Math.max(0, Math.round((_wdeadline - Date.now()) / 1000));
+  let secs = _wremaining();
   document.getElementById('waitingRespTimer').textContent = secs;
   if (waitingRespTimer) clearInterval(waitingRespTimer);
   if (window._matchPoller) { clearInterval(window._matchPoller); window._matchPoller = null; }
 
   waitingRespTimer = setInterval(function() {
-    secs--;
+    secs = _wremaining();
     const el = document.getElementById('waitingRespTimer');
     if (el) el.textContent = secs;
     if (secs <= 0) {
       clearInterval(waitingRespTimer); waitingRespTimer = null;
       if (window._matchPoller) { clearInterval(window._matchPoller); window._matchPoller = null; }
+      // ✅ Marca la richiesta come SCADUTA nel DB (se ancora pending): senza questo
+      //    restava 'pending' appesa e poteva essere auto-accettata in seguito.
+      if (currentMatch) {
+        sb.from('match_requests').update({ status: 'expired' })
+          .eq('id', currentMatch.id).in('status', ['pending', 'photo_requested'])
+          .then(() => {}, () => {});
+      }
+      currentMatch = null; matchedProfile = null;
       showExpiredPopup();
     }
   }, 1000);
@@ -3943,6 +4078,15 @@ function renderWaitingResponse(partner) {
           if (other) matchedProfile = other;
         }
         showAcceptedScreen();
+      } else if (mr.status === 'photo_requested') {
+        // B mi ha chiesto una foto live invece di accettare → fermo il countdown e
+        // proseguo con il flusso foto (vai a scattare).
+        if (!matchedProfile) {
+          const otherId = currentMatch.to_user === currentProfile.id ? currentMatch.from_user : currentMatch.to_user;
+          const { data: other } = await sb.from('profiles_public').select('*').eq('id', otherId).single();
+          if (other) matchedProfile = other;
+        }
+        handleMyMatchPhotoRequested();
       } else if (mr.status === 'rejected' || mr.status === 'expired') {
         clearInterval(window._matchPoller); window._matchPoller = null;
         clearInterval(waitingRespTimer); waitingRespTimer = null;
@@ -3970,11 +4114,18 @@ async function cancelMatchRequest() {
 // ============================================================
 function startMatchTimer() {
   stopMatchTimer();
-  matchSecs = 30;
-  updateTimerUI(30, 30);
+  // Scadenza CONDIVISA quando si decide su una richiesta in arrivo (entrambi gli utenti
+  // contano verso lo stesso istante). Per un candidato di ricerca (nessun match nel DB)
+  // resta locale a 30s.
+  const synced = matchDeadlineMs && matchDeadlineMs > Date.now();
+  const total = synced ? matchTotalSecs : 30;
+  const deadline = synced ? matchDeadlineMs : (Date.now() + total * 1000);
+  const remaining = () => Math.max(0, Math.round((deadline - Date.now()) / 1000));
+  matchSecs = remaining();
+  updateTimerUI(matchSecs, total);
   matchTimer = setInterval(() => {
-    matchSecs--;
-    updateTimerUI(matchSecs, 30);
+    matchSecs = remaining();
+    updateTimerUI(matchSecs, total);
     if (matchSecs <= 0) {
       stopMatchTimer();
       expireMatch();
@@ -4059,7 +4210,11 @@ async function acceptMatch() {
   sessionSeenIds.add(matchedProfile.id);
 
   if (!currentMatch) {
-    // Controlla se esiste già un match_request nei due sensi
+    // Controlla se esiste già un match_request RECENTE nei due sensi. ⚠️ Solo recente
+    // (ultimi 75s): senza il filtro temporale, una richiesta vecchia rimasta 'pending'
+    // (es. A aveva richiesto B e poi era scaduta/abbandonata) veniva AUTO-ACCETTATA
+    // quando l'altro mandava una richiesta → "match accettato" senza che nessuno accettasse.
+    const recentISO = new Date(Date.now() - 75000).toISOString();
     const { data: existing } = await sb.from('match_requests')
       .select('*')
       .or(
@@ -4067,10 +4222,11 @@ async function acceptMatch() {
         'and(from_user.eq.' + matchedProfile.id + ',to_user.eq.' + currentProfile.id + ')'
       )
       .in('status', ['pending', 'photo_requested'])
+      .gte('created_at', recentISO)
       .maybeSingle();
 
     if (existing) {
-      // Esiste già un match_request → B sta accettando quello di A
+      // Esiste già un match_request recente → sto accettando quello dell'altro
       currentMatch = existing;
       await sb.from('match_requests')
         .update({ status: 'accepted' })
@@ -4135,6 +4291,10 @@ async function acceptMatch() {
     //    buon fine (accettato) → lo fa il trigger server tg_charge_match_on_accept,
     //    e il client si riallinea in showAcceptedScreen().
     currentMatch = match;
+    // Scadenza CONDIVISA dell'attesa (35s dal created_at della richiesta): combacia con il
+    // timer di decisione di chi riceve (toastViewProfile) → i due countdown sono allineati.
+    matchDeadlineMs = (match && match.created_at) ? new Date(match.created_at).getTime() + 35000 : (Date.now() + 35000);
+    matchTotalSecs = 35;
     renderWaitingResponse(matchedProfile);
     goTo('waiting-response');
 
@@ -4159,6 +4319,7 @@ async function enterChat() {
 
   // ✅ FIX: naviga SUBITO alla chat, PRIMA di qualunque await/errore di rete.
   // Così l'utente entra sempre nella chat anche se le query DB falliscono.
+  if (currentMatch) markChatRead(currentMatch.id);
   try { loadChatScreen(); } catch(e) { console.error('[LiveMatch] loadChatScreen error:', e); }
   goTo('chat');
 
@@ -4189,6 +4350,11 @@ async function enterChat() {
 }
 
 function showAcceptedScreen() {
+  // ✅ Match riuscito → invalida QUALSIASI ricerca in volo: senza questo, se A stava
+  //    cercando (findMatch in corso) quando il match veniva accettato, findMatch finiva
+  //    e navigava via SOVRASCRIVENDO la schermata "match accettato" → A non riceveva la
+  //    notifica del match. (Bug #2)
+  searchGen++;
   // Match riuscito → riallinea il contatore dal server (l'iniziatore è stato scalato
   // dal trigger tg_charge_match_on_accept; l'altro resta invariato).
   if (currentProfile) {
@@ -4282,12 +4448,15 @@ async function requestPhoto() {
       .eq('id', currentMatch.id);
   }
 
-  // Crea photo request → B riceve toast via postgres_changes
-  await sb.from('photo_requests').insert({
+  // Crea photo request → B riceve toast via postgres_changes.
+  // Prendo il created_at (server) per impostare la SCADENZA CONDIVISA dello scambio foto:
+  // l'altro utente leggerà lo stesso created_at e conterà verso lo stesso istante.
+  const { data: prIns } = await sb.from('photo_requests').insert({
     match_id: currentMatch.id,
     from_user: currentProfile.id,
     to_user: matchedProfile.id
-  });
+  }).select('created_at').maybeSingle();
+  photoDeadlineMs = (prIns && prIns.created_at) ? new Date(prIns.created_at).getTime() + 60000 : (Date.now() + 60000);
 
   document.getElementById('photoTitle').textContent = 'Stai chiedendo una foto a ' + matchedProfile.name;
   goTo('photo');
@@ -4297,17 +4466,23 @@ async function requestPhoto() {
 function startPhotoTimer() {
   stopPhotoTimer();
   photoCapturedFile = null;
-  photoSecs = 60;
+  // ✅ Scadenza CONDIVISA: entrambi gli utenti contano verso lo STESSO istante
+  //    (photoDeadlineMs = created_at del photo_request + 60s, impostato all'avvio dello
+  //    scambio). Così i due countdown sono sincronizzati, a prescindere da quando ciascuno
+  //    è entrato nella schermata. Fallback 60s da adesso se la scadenza non è disponibile.
+  const deadline = (photoDeadlineMs && photoDeadlineMs > Date.now()) ? photoDeadlineMs : (Date.now() + 60000);
+  const remaining = () => Math.max(0, Math.round((deadline - Date.now()) / 1000));
+  photoSecs = remaining();
   document.getElementById('cameraFrame').classList.remove('captured');
   document.getElementById('camDefault').style.display = 'flex';
   document.getElementById('photoPreview').style.display = 'none';
   document.getElementById('btnSendPhoto').style.display = 'none';
-  document.getElementById('photoFill').style.width = '100%';
-  document.getElementById('photoTimerTxt').textContent = '60s';
+  document.getElementById('photoFill').style.width = Math.min(100, photoSecs / 60 * 100) + '%';
+  document.getElementById('photoTimerTxt').textContent = photoSecs + 's';
 
   photoTimer = setInterval(() => {
-    photoSecs--;
-    const pct = photoSecs / 60 * 100;
+    photoSecs = remaining();
+    const pct = Math.min(100, photoSecs / 60 * 100);
     document.getElementById('photoFill').style.width = pct + '%';
     document.getElementById('photoTimerTxt').textContent = photoSecs + 's';
     if (photoSecs <= 10) document.getElementById('photoFill').style.background = '#ff4d6d';
@@ -4331,6 +4506,17 @@ function stopPhotoTimer() {
 function leavePhotoScreen() {
   stopPhotoTimer();
   goTo('match');
+}
+
+// Pulsante rosso "Annulla match" nella schermata foto: annulla il match per ENTRAMBI
+// (l'altro riceve "Match rifiutato" tramite il suo listener realtime) e torna in home.
+function cancelMatchFromPhoto() {
+  stopPhotoTimer();
+  const m = currentMatch;
+  if (m && m.id) {
+    sb.from('match_requests').update({ status: 'rejected' }).eq('id', m.id).then(() => {}, () => {});
+  }
+  goHome(); // azzera stato + timer e torna alla home
 }
 
 function handlePhotoCapture(e) {
@@ -4523,14 +4709,17 @@ function showPhotoReviewScreen(photoUrl, photoReq) {
 
   goTo('photo-review');
 
-  // Timer 60s per decidere
-  let secs = 60;
+  // Timer 60s con scadenza CONDIVISA: ancorata all'updated_at del photo_request (istante in
+  // cui sono arrivate entrambe le foto), così i due utenti rivedono con lo stesso countdown.
+  reviewDeadlineMs = (photoReq && photoReq.updated_at) ? new Date(photoReq.updated_at).getTime() + 60000 : (Date.now() + 60000);
+  const _rremaining = () => Math.max(0, Math.round((reviewDeadlineMs - Date.now()) / 1000));
+  let secs = _rremaining();
   const timerEl = document.getElementById('photoReviewTimer');
   if (timerEl) timerEl.textContent = secs + 's';
 
   if (window._photoReviewTimer) clearInterval(window._photoReviewTimer);
   window._photoReviewTimer = setInterval(async () => {
-    secs--;
+    secs = _rremaining();
     if (timerEl) timerEl.textContent = secs + 's';
     if (secs <= 0) {
       clearInterval(window._photoReviewTimer);
@@ -5051,6 +5240,7 @@ function endMatchFlow(status) {
   const active = document.querySelector('.screen.active');
   // Una chat già attiva = match realmente accettato: non interromperla.
   if (active && active.id === 's-chat') return;
+  searchGen++; // invalida una eventuale ricerca in volo (evita override della navigazione)
   // Mostra l'avviso se sono su una schermata di match OPPURE se ero in home ma avevo
   // una richiesta in arrivo VISIBILE (toast): così, se chi mi ha mandato la richiesta
   // la annulla, ricevo comunque "Match rifiutato" e torno pulito in home (simmetrico
@@ -5120,12 +5310,11 @@ async function subscribeToMatches() {
         .select('*').eq('id', req.from_user).single();
       if (!fromProfile) return;
 
-      currentMatch = req;
-      matchedProfile = fromProfile;
-      incomingPhotoReq = false;
-      renderMatchScreen(fromProfile);
-
-      // Mostra toast non invasivo in alto
+      // ✅ Toast NON INVASIVO: NON tocco currentMatch/matchedProfile/renderMatchScreen.
+      //    Così, se sto cercando, la ricerca in corso NON viene disturbata (niente
+      //    tug-of-war sullo stato) e nessuno mi sbatte in home. Il toast porta con sé i
+      //    propri dati (matchData/profile); se lo tocco, toastViewProfile/Accept/Reject
+      //    impostano lo stato a partire dal toast (e fermano la ricerca con searchGen++).
       showToast({
         profile: fromProfile,
         type: 'match',
@@ -5154,6 +5343,16 @@ async function subscribeToMatches() {
           }
           showAcceptedScreen();
         }
+      } else if (req.status === 'photo_requested') {
+        // B mi ha chiesto una foto live invece di accettare → ferma il countdown e
+        // prosegui col flusso foto (vai a scattare).
+        currentMatch = req;
+        if (!matchedProfile) {
+          const otherId = req.from_user === currentProfile.id ? req.to_user : req.from_user;
+          const { data: otherProfile } = await sb.from('profiles_public').select('*').eq('id', otherId).maybeSingle();
+          if (otherProfile) matchedProfile = otherProfile;
+        }
+        handleMyMatchPhotoRequested();
       } else if (req.status === 'rejected' || req.status === 'expired') {
         endMatchFlow(req.status);
       }
@@ -5168,8 +5367,15 @@ async function subscribeToMatches() {
       filter: `to_user=eq.${currentProfile.id}`
     }, (payload) => {
       const req = payload.new;
-      if (!req || !currentMatch || currentMatch.id !== req.id) return;
-      if (req.status === 'rejected' || req.status === 'expired') endMatchFlow(req.status);
+      if (!req) return;
+      if (req.status !== 'rejected' && req.status !== 'expired') return;
+      if (currentMatch && currentMatch.id === req.id) {
+        // Ero DENTRO il flusso di questo match → avviso "Match rifiutato" + cleanup.
+        endMatchFlow(req.status);
+      } else if (toastMatchData && toastMatchData.matchData && toastMatchData.matchData.id === req.id) {
+        // Era solo un toast (richiesta in arrivo non ancora aperta) → fallo sparire.
+        dismissToast();
+      }
     })
     .subscribe();
 
@@ -5182,6 +5388,8 @@ async function subscribeToMatches() {
       filter: 'to_user=eq.' + currentProfile.id
     }, async (payload) => {
       const req = payload.new;
+      // Scadenza CONDIVISA dello scambio foto: stesso created_at (server) usato dall'altro.
+      if (req && req.created_at) photoDeadlineMs = new Date(req.created_at).getTime() + 60000;
       const { data: fromProfile } = await sb.from('profiles_public')
         .select('*').eq('id', req.from_user).single();
       if (!fromProfile) return;
@@ -5289,6 +5497,7 @@ function showExpiredPopup() {
 }
 
 function leaveChat() {
+  if (currentMatch) markChatRead(currentMatch.id); // tutto letto fino a ora
   if (msgChannel) { sb.removeChannel(msgChannel); msgChannel = null; }
   if (window._msgPoller) { clearInterval(window._msgPoller); window._msgPoller = null; }
   if (window._chatStatusPoller) { clearInterval(window._chatStatusPoller); window._chatStatusPoller = null; }
