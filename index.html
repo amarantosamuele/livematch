@@ -1714,6 +1714,18 @@ body::before {
         </label>
       </div>
 
+      <!-- TOGGLE FATTI VEDERE DA PERSONE GIÀ INCONTRATE -->
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span>👀 Fatti vedere da persone già incontrate</span>
+          <small>Se spento, chi hai già incontrato non ti ritrova nella ricerca</small>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggleShowToMet" onchange="saveShowToMetPref(this.checked)"/>
+          <div class="toggle-slider"></div>
+        </label>
+      </div>
+
       <!-- TOGGLE TEMA SCURO -->
       <div class="toggle-row">
         <div class="toggle-label">
@@ -1926,7 +1938,7 @@ window._loadingFallback = setTimeout(function() {
 // ============================================================
 // ⚠️ AGGIORNARE A OGNI BUILD: deve combaciare con CURRENT_PROJECT_VERSION dell'app iOS.
 // Usato dal "forza aggiornamento" dell'admin (se APP_BUILD < min_build → schermata Aggiorna).
-const APP_BUILD = 8;
+const APP_BUILD = 9;
 const SUPABASE_URL = 'https://dmzozvidylvdaclzyeqk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtem96dmlkeWx2ZGFjbHp5ZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzgyODQsImV4cCI6MjA5NTQxNDI4NH0.dmdHfeoXrPHCpFzOMxoVo8TtTuj1M9KRPnOUWRMn2sE';
 
@@ -2940,15 +2952,24 @@ function attachSwipeDelete(item) {
     const x = Math.max(-W, Math.min(0, (open ? -W : 0) + dx));
     setX(x);
   }, { passive: true });
-  item.addEventListener('touchend', () => {
+  item.addEventListener('touchend', (e) => {
     if (!dragging) return; dragging = false;
     item.style.transition = 'transform .2s ease';
     const cur = parseFloat((item.style.transform.match(/-?[\d.]+/) || [0])[0]) || 0;
-    open = cur < -W / 2;
+    const wasOpen = open;
+    open = moved ? (cur < -W / 2) : false; // tap senza swipe su riga aperta → si chiude
     setX(open ? -W : 0);
-    if (moved) { item._suppressClick = true; setTimeout(() => { item._suppressClick = false; }, 350); }
+    // ⚠️ Se c'è stato uno SWIPE (moved) o stavo chiudendo una riga già aperta, NON deve
+    //    aprirsi la chat: la lista ha una delega su 'touchend' (oltre che su 'click'), quindi
+    //    fermo la propagazione del touchend qui + sopprimo il click sintetico.
+    if (moved || wasOpen) {
+      e.stopPropagation();
+      item._suppressClick = true;
+      window._chatSwipedAt = Date.now(); // guardia globale: openChatFromList ignora aperture subito dopo
+      setTimeout(() => { item._suppressClick = false; }, 450);
+    }
   });
-  // Se aperto o swipe appena fatto → il tap NON apre la chat (e chiude la riga).
+  // Backup per il 'click' sintetico: se swipe appena fatto o riga aperta → non aprire la chat.
   item.addEventListener('click', (e) => {
     if (item._suppressClick || open) {
       e.stopImmediatePropagation();
@@ -2986,6 +3007,8 @@ async function resolveCanonicalMatch(otherId) {
 }
 
 async function openChatFromList(match, other) {
+  // ✅ Se ho appena fatto uno SWIPE (per eliminare), NON aprire la chat al rilascio del dito.
+  if (Date.now() - (window._chatSwipedAt || 0) < 500) return;
   // ✅ FIX iOS: guardia anti doppio-tap (onclick + delegation possono sparare entrambi)
   if (_enteringChat) return;
   _enteringChat = true;
@@ -3420,6 +3443,19 @@ function loadRematchPref() {
   if (toggle) toggle.checked = val === '1';
 }
 
+// "Fatti vedere da persone già incontrate" → preferenza SUL SERVER (la leggono gli altri
+// che cercano: find_live_candidates esclude chi ha questo spento se ti ha già incontrato).
+function saveShowToMetPref(val) {
+  if (!currentProfile) return;
+  currentProfile.show_to_met = !!val;
+  sb.from('profiles').update({ show_to_met: !!val }).eq('id', currentProfile.id).then(() => {}, () => {});
+}
+function loadShowToMetPref() {
+  const toggle = document.getElementById('toggleShowToMet');
+  // Default OFF: acceso solo se l'utente l'ha attivato esplicitamente (show_to_met === true).
+  if (toggle) toggle.checked = !!(currentProfile && currentProfile.show_to_met === true);
+}
+
 // ---- Tema chiaro/scuro ----
 function setDarkTheme(on) {
   document.documentElement.classList.toggle('theme-dark', !!on);
@@ -3433,6 +3469,7 @@ function loadThemeToggle() {
 function renderProfileScreen(p) {
   // Carica preferenza rematch + stato tema
   loadRematchPref();
+  loadShowToMetPref();
   loadThemeToggle();
   const av = document.getElementById('profileBigAv');
   if (p.avatar_url) {
