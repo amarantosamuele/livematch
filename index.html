@@ -1938,7 +1938,7 @@ window._loadingFallback = setTimeout(function() {
 // ============================================================
 // ⚠️ AGGIORNARE A OGNI BUILD: deve combaciare con CURRENT_PROJECT_VERSION dell'app iOS.
 // Usato dal "forza aggiornamento" dell'admin (se APP_BUILD < min_build → schermata Aggiorna).
-const APP_BUILD = 9;
+const APP_BUILD = 11;
 const SUPABASE_URL = 'https://dmzozvidylvdaclzyeqk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtem96dmlkeWx2ZGFjbHp5ZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzgyODQsImV4cCI6MjA5NTQxNDI4NH0.dmdHfeoXrPHCpFzOMxoVo8TtTuj1M9KRPnOUWRMn2sE';
 
@@ -2288,7 +2288,17 @@ function showToast({ profile, type, matchData }) {
   dismissToast();
 
   toastMatchData = { profile, type, matchData };
-  toastSecs = 60;
+  // ⏱️ Countdown allineato alla SCADENZA REALE della richiesta (match: created_at+35s,
+  // come il timer di chi aspetta; foto: photoDeadlineMs). Prima era 60s fissi: il toast
+  // restava "vivo" 25s dopo che la richiesta era già scaduta per chi l'aveva mandata.
+  let _deadline;
+  if (type === 'photo') {
+    _deadline = (photoDeadlineMs && photoDeadlineMs > Date.now()) ? photoDeadlineMs : (Date.now() + 60000);
+  } else {
+    _deadline = (matchData && matchData.created_at) ? (new Date(matchData.created_at).getTime() + 35000) : (Date.now() + 35000);
+  }
+  toastSecs = Math.max(1, Math.round((_deadline - Date.now()) / 1000));
+  const toastTotal = toastSecs; // per la barra di progresso
 
   const wrap = document.getElementById('toastWrap');
 
@@ -2302,8 +2312,8 @@ function showToast({ profile, type, matchData }) {
     : `💘 ${safeName} vuole fare match!`;
 
   const subText = type === 'photo'
-    ? 'Hai 60 secondi per scattare una foto dal vivo'
-    : `${escapeHtml(profile.age)} anni · ${escapeHtml(profile.city)} · Hai 60s per rispondere`;
+    ? `Hai ${toastSecs} secondi per scattare una foto dal vivo`
+    : `${escapeHtml(profile.age)} anni · ${escapeHtml(profile.city)} · Hai ${toastSecs}s per rispondere`;
 
   const actionsHtml = type === 'photo'
     ? `<button class="toast-btn view" onclick="toastViewProfile()">Vedi profilo</button>
@@ -2321,7 +2331,7 @@ function showToast({ profile, type, matchData }) {
         <div class="toast-sub">${subText}</div>
         <div class="toast-actions">${actionsHtml}</div>
       </div>
-      <div class="toast-timer" id="toastTimer">60s</div>
+      <div class="toast-timer" id="toastTimer">${toastSecs}s</div>
       <div class="toast-progress" id="toastProgress" style="width:100%"></div>
     </div>
   `;
@@ -2346,7 +2356,7 @@ function showToast({ profile, type, matchData }) {
     const timerEl = document.getElementById('toastTimer');
     const progressEl = document.getElementById('toastProgress');
     if (timerEl) timerEl.textContent = toastSecs + 's';
-    if (progressEl) progressEl.style.width = (toastSecs / 60 * 100) + '%';
+    if (progressEl) progressEl.style.width = (toastSecs / toastTotal * 100) + '%';
     if (toastSecs <= 10 && timerEl) timerEl.style.color = '#ff8c00';
     if (toastSecs <= 0) dismissToast();
   }, 1000);
@@ -2390,18 +2400,31 @@ function toastViewProfile() {
   dismissToast();
 }
 
-function toastAccept() {
+// Accetta un match SOLO se è ancora attivo. Senza il filtro di stato, un update
+// "cieco" a accepted poteva sovrascrivere una richiesta già expired/rejected
+// (es. l'altro l'ha annullata e il Realtime non ha consegnato l'evento, caso noto
+// su iOS) → si finiva su "È un Match!" con una persona che non c'era più.
+// 'accepted' è incluso per idempotenza (accettazioni simultanee dei due lati).
+// Ritorna true se l'accettazione è valida, false se la richiesta non è più viva.
+async function tryAcceptMatch(matchId) {
+  const { data, error } = await sb.from('match_requests')
+    .update({ status: 'accepted' })
+    .eq('id', matchId)
+    .in('status', ['pending', 'photo_requested', 'accepted'])
+    .select('id');
+  return !error && !!(data && data.length);
+}
+
+async function toastAccept() {
   if (!toastMatchData) return;
   searchGen++; // ferma una eventuale ricerca in volo (vedi toastViewProfile)
   const { matchData, profile } = toastMatchData;
   currentMatch = matchData;   // match_request già esiste nel DB
   matchedProfile = profile;
   dismissToast();
-  // B accetta → aggiorna status e mostra "È un Match!"
-  sb.from('match_requests')
-    .update({ status: 'accepted' })
-    .eq('id', currentMatch.id)
-    .then(() => showAcceptedScreen());
+  // B accetta → aggiorna status e mostra "È un Match!" (solo se ancora valida)
+  if (await tryAcceptMatch(currentMatch.id)) showAcceptedScreen();
+  else { currentMatch = null; matchedProfile = null; showExpiredPopup(); }
 }
 
 function toastReject() {
@@ -2773,8 +2796,12 @@ async function refreshChatNavBadge() {
       .eq('status', 'accepted');
     if (!matches || !matches.length) { updateChatNavBadge(0); return; }
     const chatIds = matches.map(m => m.id);
+    // ⚠️ order desc + limit ESPLICITI: senza ORDER BY, PostgREST tronca al cap di
+    // default (1000) su righe ARBITRARIE → oltre quella soglia il conteggio dei non
+    // letti poteva sbagliare. Così guardiamo sempre i messaggi PIÙ RECENTI.
     const { data: msgs } = await sb.from('messages')
-      .select('chat_id, sender_id, created_at').in('chat_id', chatIds);
+      .select('chat_id, sender_id, created_at').in('chat_id', chatIds)
+      .order('created_at', { ascending: false }).limit(500);
     const reads = _getChatReads();
     const unreadChats = new Set();
     (msgs || []).forEach(m => {
@@ -2828,7 +2855,7 @@ async function loadChatList() {
   const chatIds = rows.map(r => r.match.id);
   const [profRes, msgRes] = await Promise.all([
     sb.from('profiles_public').select('*').in('id', otherIds),
-    sb.from('messages').select('chat_id, sender_id, content, type, created_at').in('chat_id', chatIds).order('created_at', { ascending: false })
+    sb.from('messages').select('chat_id, sender_id, content, type, created_at').in('chat_id', chatIds).order('created_at', { ascending: false }).limit(500)
   ]);
   const profById = {};
   (profRes.data || []).forEach(p => { profById[p.id] = p; });
@@ -4183,11 +4210,9 @@ function showPhotoReview(photoUrl, profile) {
 
 async function acceptAfterPhoto() {
   if (!currentMatch) return;
-  // Aggiorna match a accepted
-  await sb.from('match_requests')
-    .update({ status: 'accepted' })
-    .eq('id', currentMatch.id);
-  showAcceptedScreen();
+  // Aggiorna match a accepted (solo se ancora valido: l'altro può aver annullato)
+  if (await tryAcceptMatch(currentMatch.id)) showAcceptedScreen();
+  else endMatchFlow('expired');
 }
 
 async function rejectAfterPhoto() {
@@ -4412,10 +4437,8 @@ async function acceptMatch() {
     if (existing) {
       // Esiste già un match_request recente → sto accettando quello dell'altro
       currentMatch = existing;
-      await sb.from('match_requests')
-        .update({ status: 'accepted' })
-        .eq('id', existing.id);
-      showAcceptedScreen();
+      if (await tryAcceptMatch(existing.id)) showAcceptedScreen();
+      else { currentMatch = null; matchedProfile = null; showExpiredPopup(); }
       return;
     }
 
@@ -4463,10 +4486,8 @@ async function acceptMatch() {
         .maybeSingle();
       if (retry) {
         currentMatch = retry;
-        await sb.from('match_requests')
-          .update({ status: 'accepted' })
-          .eq('id', retry.id);
-        showAcceptedScreen();
+        if (await tryAcceptMatch(retry.id)) showAcceptedScreen();
+        else { currentMatch = null; matchedProfile = null; showExpiredPopup(); }
       }
       return;
     }
@@ -4483,11 +4504,9 @@ async function acceptMatch() {
     goTo('waiting-response');
 
   } else {
-    // currentMatch esiste già → aggiorna status
-    await sb.from('match_requests')
-      .update({ status: 'accepted' })
-      .eq('id', currentMatch.id);
-    showAcceptedScreen();
+    // currentMatch esiste già → aggiorna status (solo se la richiesta è ancora viva)
+    if (await tryAcceptMatch(currentMatch.id)) showAcceptedScreen();
+    else { currentMatch = null; matchedProfile = null; showExpiredPopup(); }
   }
 }
 
@@ -4929,9 +4948,9 @@ async function acceptPhotoReview() {
     .select('*').eq('match_id', currentMatch.id).single();
 
   if (req && req.accepted_by_requester && req.accepted_by_receiver) {
-    // Entrambi hanno accettato → chat!
-    await sb.from('match_requests').update({ status: 'accepted' }).eq('id', currentMatch.id);
-    showAcceptedScreen();
+    // Entrambi hanno accettato → chat! (solo se il match è ancora vivo)
+    if (await tryAcceptMatch(currentMatch.id)) showAcceptedScreen();
+    else endMatchFlow('expired');
   } else {
     // Aspetto che anche l'altro accetti
     goTo('waiting-response');
@@ -4962,8 +4981,8 @@ async function acceptPhotoReview() {
         if (req && req.accepted_by_requester && req.accepted_by_receiver) {
           clearInterval(window._photoPoller); window._photoPoller = null;
           clearInterval(waitingRespTimer); waitingRespTimer = null;
-          await sb.from('match_requests').update({ status: 'accepted' }).eq('id', matchIdAccept);
-          showAcceptedScreen();
+          if (await tryAcceptMatch(matchIdAccept)) showAcceptedScreen();
+          else endMatchFlow('expired');
         }
       } catch(e) {}
     }, 5000); // ✅ 5s (era 1s)
@@ -5243,6 +5262,9 @@ async function sendMessage() {
 
   if (error) {
     console.error('sendMessage error:', error);
+    // La bolla è già a schermo (render ottimistico): avvisa che NON è partito,
+    // altrimenti l'utente crede di aver inviato (l'altro non riceve nulla).
+    miniToast('Messaggio non inviato, riprova');
   }
 }
 
@@ -5270,19 +5292,25 @@ async function sendPhotoMessage(e) {
       contentType: mimeType, upsert: true
     });
 
-    if (!error) {
-      const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
-      const msg = {
-        chat_id: currentMatch.id,
-        sender_id: currentProfile.id,
-        content: urlData.publicUrl,
-        type: 'photo'
-      };
-      renderMessage({ ...msg, sender: currentProfile, created_at: new Date().toISOString() });
-      await sb.from('messages').insert(msg);
+    if (error) {
+      console.error('sendPhotoMessage upload error:', error);
+      miniToast('Foto non inviata, riprova');
+      return;
     }
+    const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
+    const msg = {
+      chat_id: currentMatch.id,
+      sender_id: currentProfile.id,
+      content: urlData.publicUrl,
+      type: 'photo'
+    };
+    // Insert PRIMA del render (come i vocali): la bolla appare solo se è partita davvero.
+    const { error: insErr } = await sb.from('messages').insert(msg);
+    if (insErr) { console.error('sendPhotoMessage insert error:', insErr); miniToast('Foto non inviata, riprova'); return; }
+    renderMessage({ ...msg, sender: currentProfile, created_at: new Date().toISOString() });
   } catch(e) {
     console.error('sendPhotoMessage error:', e);
+    miniToast('Foto non inviata, riprova');
   }
 }
 
@@ -5605,18 +5633,16 @@ async function subscribeToMatches() {
     })
     .subscribe();
 
-  // Ascolta UPDATE su photo_requests
-  // Quando entrambi inviano la foto → vai in chat
-  photoFulfilledChannel = sb.channel('photo-fulfilled-' + currentProfile.id)
-    .on('postgres_changes', {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'photo_requests'
-    }, async (payload) => {
+  // Ascolta UPDATE su photo_requests — quando entrambi inviano la foto → vai in chat.
+  // ⚡ PERF: filtri SERVER-SIDE (from_user / to_user). Prima il canale era senza filtro
+  //    → il realtime valutava OGNI update di photo_requests per OGNI client connesso.
+  //    postgres_changes non supporta OR in un filtro → due subscription, stesso handler
+  //    (un update mi riguarda al massimo per uno dei due lati).
+  const onPhotoReqUpdate = async (payload) => {
       const req = payload.new;
       if (!req) return;
 
-      // Controlla se riguarda me
+      // Difesa extra (i filtri server-side già garantiscono che riguardi me)
       const isMyReq = req.from_user === currentProfile.id || req.to_user === currentProfile.id;
       if (!isMyReq) return;
 
@@ -5684,7 +5710,12 @@ async function subscribeToMatches() {
           startPhotoTimer();
         }
       }
-    })
+  };
+  photoFulfilledChannel = sb.channel('photo-fulfilled-' + currentProfile.id)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'photo_requests',
+        filter: 'from_user=eq.' + currentProfile.id }, onPhotoReqUpdate)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'photo_requests',
+        filter: 'to_user=eq.' + currentProfile.id }, onPhotoReqUpdate)
     .subscribe();
 
   // ✅ Avvia il guardiano globale del match (backstop affidabile in ogni fase).
