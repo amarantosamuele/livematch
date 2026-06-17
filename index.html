@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <title>LiveMatch</title>
 <script src="vendor/supabase.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Lora:ital,wght@0,500;0,600;0,700;1,600&display=swap" rel="stylesheet"/>
 <style>
 /* ===== TEMA CHIARO (default) ===== */
 :root {
@@ -138,7 +138,7 @@ body::before {
   padding-top: max(12px, env(safe-area-inset-top));
   flex-shrink: 0;
 }
-.logo { font-family: 'DM Serif Display', serif; font-size: 22px; }
+.logo { font-family: 'Lora', serif; font-weight:600; font-size: 22px; }
 .logo span { color: var(--accent); font-style: italic; }
 .live-pill {
   display: flex; align-items: center; gap: 5px;
@@ -154,7 +154,7 @@ body::before {
 .form-body { flex:1;overflow-y:auto;padding:20px;padding-bottom:max(20px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px; }
 .form-body::-webkit-scrollbar{width:3px}
 .form-body::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
-.form-title { font-family:'DM Serif Display',serif;font-size:26px;line-height:1.2;margin-bottom:4px; }
+.form-title { font-family:'Lora',serif;font-weight:600;font-size:26px;line-height:1.2;margin-bottom:4px; }
 .form-sub { font-size:14px;color:var(--text2); } /* REDESIGN: era 13 */
 .field { display:flex;flex-direction:column;gap:6px; }
 .field label { font-size:12px;color:var(--text2);font-weight:500;letter-spacing:0.3px; }
@@ -259,7 +259,7 @@ body::before {
   background:rgba(255,77,109,0.2);border:1px solid rgba(255,77,109,0.5);
   display:flex;align-items:center;justify-content:center;font-size:24px;
 }
-.waiting-label{font-family:'DM Serif Display',serif;font-size:22px;text-align:center;line-height:1.3;}
+.waiting-label{font-family:'Lora',serif;font-weight:600;font-size:22px;text-align:center;line-height:1.3;}
 .waiting-sub{font-size:14px;color:var(--text2);text-align:center;} /* REDESIGN: era 13 */
 .online-badge{
   background:var(--surface2);border:0.5px solid var(--border2);
@@ -289,24 +289,65 @@ body::before {
 .big-avatar{
   width:80px;height:80px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  font-family:'DM Serif Display',serif;font-size:28px;color:#fff;
+  font-family:'Lora',serif;font-weight:600;font-size:28px;color:#fff;
   border:3px solid var(--surface);object-fit:cover;overflow:hidden;
   background:linear-gradient(135deg,#f77f8a,#e64b6b);
 }
-.profile-name{font-family:'DM Serif Display',serif;font-size:20px;}
+.profile-name{font-family:'Lora',serif;font-weight:600;font-size:20px;}
 .profile-meta{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;}
 .meta-pill{background:var(--surface3);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--text2);}
 .timer-wrap{position:absolute;top:14px;right:14px;}
 /* ===== REDESIGN: HERO CARD del match — foto a tutta larghezza, info in overlay ===== */
 .hero-card{
-  position:relative;width:100%;aspect-ratio:4/5;max-height:46vh;
-  border-radius:var(--r2);overflow:hidden;flex-shrink:0;
+  position:relative;width:100%;aspect-ratio:4/5;max-height:42vh;
+  border-radius:var(--r2);overflow:hidden;flex-shrink:0;cursor:pointer;
   background:linear-gradient(135deg,#f77f8a,#e64b6b);
   box-shadow:var(--shadow-md);
 }
+.hero-card:active{transform:scale(0.99);transition:transform .1s;}
+/* hint "tocca per i dettagli" (alto-sinistra; il timer sta in alto-destra) */
+.hero-hint{
+  position:absolute;top:12px;left:12px;z-index:2;
+  background:rgba(0,0,0,0.45);color:#fff;font-size:11px;font-weight:600;
+  padding:5px 11px;border-radius:20px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  pointer-events:none;
+}
+/* Badge "ti ha già chiesto un match": appare quando, mentre sei sulla sua card,
+   l'altra persona ti manda una richiesta. Trasparenza senza disabilitare i pulsanti. */
+.hero-incoming{
+  position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:3;
+  background:linear-gradient(135deg,#ff4d6d,#ff7a59);color:#fff;font-size:12px;font-weight:700;
+  padding:6px 13px;border-radius:20px;box-shadow:0 3px 10px rgba(255,77,109,0.4);
+  pointer-events:none;white-space:nowrap;animation:heroInPop .25s ease;
+}
+@keyframes heroInPop{from{opacity:0;transform:translateX(-50%) translateY(-6px) scale(.9);}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1);}}
+/* Nota sopra i pulsanti quando la persona che guardo mi ha già chiesto match */
+.incoming-note{
+  background:rgba(255,77,109,0.10);border:0.5px solid rgba(255,77,109,0.28);
+  color:var(--text);font-size:13px;font-weight:600;line-height:1.4;text-align:center;
+  padding:10px 14px;border-radius:14px;margin-bottom:10px;animation:noteIn .25s ease;
+}
+@keyframes noteIn{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
+/* ====== VOICE PLAYER stile Hinge (pulsante play tondo + waveform a barre) ====== */
+.voice-player{display:flex;align-items:center;gap:11px;width:230px;max-width:100%;padding:3px 0;}
+.vp-play{flex-shrink:0;width:40px;height:40px;border-radius:50%;border:none;background:var(--accent);
+  color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  box-shadow:0 2px 7px rgba(255,77,109,0.32);transition:transform .12s;}
+.vp-play:active{transform:scale(0.93);}
+.vp-play svg{width:15px;height:15px;display:block;}
+.vp-wave{flex:1;display:flex;align-items:center;gap:2px;height:36px;cursor:pointer;}
+.vp-bar{flex:1 1 0;min-width:2px;border-radius:3px;background:var(--accent);opacity:.26;
+  transition:opacity .12s;}
+.vp-bar.played{opacity:1;}
+.vp-dur{flex-shrink:0;font-size:11px;font-weight:600;color:var(--text2);
+  font-variant-numeric:tabular-nums;min-width:30px;text-align:right;}
+/* Contrasto nella bolla chat "me" (sfondo accent) → bianco */
+.bubble.me .vp-play{background:#fff;color:var(--accent);box-shadow:0 2px 7px rgba(0,0,0,0.18);}
+.bubble.me .vp-bar{background:#fff;}
+.bubble.me .vp-dur{color:rgba(255,255,255,0.85);}
 .hero-photo{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-family:'DM Serif Display',serif;font-size:72px;color:#fff;
+  font-family:'Lora',serif;font-weight:600;font-size:72px;color:#fff;
 }
 /* il JS inietta border-radius:50% inline sull'img (era l'avatar tondo): qui la foto riempie la card */
 .hero-photo img{width:100%;height:100%;object-fit:cover;border-radius:0 !important;}
@@ -316,7 +357,7 @@ body::before {
 }
 .hero-info{position:absolute;left:16px;right:16px;bottom:14px;display:flex;flex-direction:column;gap:8px;}
 .hero-name{
-  font-family:'DM Serif Display',serif;font-size:30px;color:#fff;line-height:1.1;
+  font-family:'Lora',serif;font-weight:600;font-size:30px;color:#fff;line-height:1.1;
   text-shadow:0 1px 10px rgba(0,0,0,0.35);
 }
 .hero-info .profile-meta{justify-content:flex-start;}
@@ -342,17 +383,36 @@ body::before {
   font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;
 } /* REDESIGN: l'azione "match" è il rosa del brand (prima verde, fuori palette) */
 .btn-accept:hover{opacity:0.9}
+/* CTA "foto dal vivo" — feature virale anti-catfish: deve risaltare. Gradiente viola/indaco
+   (diverso dal rosa del match → non competono), glow lento + sheen che scorre per l'occhio. */
 .btn-photo{
-  width:100%;padding:11px;border-radius:var(--r);
-  background:transparent;border:0.5px solid var(--border2);
-  color:var(--blue);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;
-  transition:background 0.15s;
+  position:relative;overflow:hidden;width:100%;padding:12px 16px;border-radius:var(--r);
+  background:linear-gradient(135deg,#8b5cf6 0%,#6366f1 55%,#3b82f6 100%);border:none;
+  color:#fff;font-family:'DM Sans',sans-serif;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:0 6px 18px rgba(99,102,241,0.40);
+  animation:photoGlow 2.8s ease-in-out infinite;transition:transform .12s;
 }
-.btn-photo:hover{background:rgba(77,159,255,0.08)}
+.btn-photo:active{transform:scale(0.98);}
+.btn-photo > *{position:relative;z-index:1;}
+.btn-photo .bp-ic{font-size:19px;line-height:1;}
+.btn-photo .bp-txt{text-align:left;line-height:1.15;}
+.btn-photo .bp-main{display:block;font-size:15px;font-weight:700;}
+.btn-photo .bp-sub{display:block;font-size:11px;font-weight:500;opacity:.92;margin-top:1px;}
+.btn-photo::before{
+  content:"";position:absolute;top:0;left:-60%;width:45%;height:100%;z-index:0;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,0.38),transparent);
+  transform:skewX(-18deg);animation:photoSheen 3.4s ease-in-out infinite;
+}
+@keyframes photoGlow{0%,100%{box-shadow:0 6px 18px rgba(99,102,241,0.40);}50%{box-shadow:0 7px 26px rgba(99,102,241,0.66);}}
+@keyframes photoSheen{0%{left:-60%;}48%,100%{left:130%;}}
+@media (prefers-reduced-motion: reduce){
+  .btn-photo{animation:none;} .btn-photo::before{animation:none;display:none;}
+}
 
 /* ---- PHOTO ---- */
 #s-photo .body{flex:1;display:flex;flex-direction:column;padding:16px 20px;gap:14px;align-items:center;}
-.photo-title{font-family:'DM Serif Display',serif;font-size:19px;text-align:center;line-height:1.3;}
+.photo-title{font-family:'Lora',serif;font-weight:600;font-size:19px;text-align:center;line-height:1.3;}
 .camera-frame{
   width:220px;height:220px;border-radius:var(--r2);
   background:var(--surface2);border:1.5px dashed var(--border2);
@@ -378,7 +438,7 @@ body::before {
 .chat-av{
   width:36px;height:36px;border-radius:50%;flex-shrink:0;overflow:hidden;
   display:flex;align-items:center;justify-content:center;
-  font-family:'DM Serif Display',serif;font-size:14px;color:#fff;
+  font-family:'Lora',serif;font-weight:600;font-size:14px;color:#fff;
   background:linear-gradient(135deg,#f77f8a,#e64b6b);
 }
 .chat-av img{width:100%;height:100%;object-fit:cover;}
@@ -409,6 +469,14 @@ body::before {
 .bubble.me{background:var(--accent);color:#fff;border-bottom-right-radius:4px;}
 .bubble-time{font-size:10px;opacity:0.55;margin-top:2px;text-align:right;}
 .bubble img{width:100%;border-radius:10px;margin-top:4px;}
+/* Foto in chat: l'immagine È il messaggio (niente cornice/sfondo bolla), orario in overlay */
+.bubble.bubble-media{background:transparent;padding:0;box-shadow:none;border-radius:0;max-width:none;}
+.msg-photo{position:relative;display:inline-block;line-height:0;border-radius:16px;overflow:hidden;background:var(--surface2);max-width:62vw;}
+.msg-photo img{display:block;width:212px;max-width:62vw;height:auto;border-radius:16px;margin:0;cursor:zoom-in;}
+.msg-photo .msg-photo-time{
+  position:absolute;right:7px;bottom:7px;font-size:10px;font-weight:600;color:#fff;
+  background:rgba(0,0,0,0.42);padding:2px 8px;border-radius:11px;line-height:1.5;letter-spacing:.2px;
+}
 .typing-row{display:none;padding:0 18px 8px;align-items:center;gap:7px;}
 .typing-row.show{display:flex;}
 .typing-bubble{
@@ -483,7 +551,7 @@ body::before {
 }
 @keyframes popIn{from{transform:scale(0.85);opacity:0}to{transform:scale(1);opacity:1}}
 .popup-emoji{font-size:40px;}
-.popup-title{font-family:'DM Serif Display',serif;font-size:19px;}
+.popup-title{font-family:'Lora',serif;font-weight:600;font-size:19px;}
 .popup-sub{font-size:14px;color:var(--text2);line-height:1.5;} /* REDESIGN: era 13 */
 
 /* ---- PROFILE SCREEN ---- */
@@ -492,11 +560,11 @@ body::before {
 .profile-big-av{
   width:70px;height:70px;border-radius:50%;overflow:hidden;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
-  font-family:'DM Serif Display',serif;font-size:26px;color:#fff;
+  font-family:'Lora',serif;font-weight:600;font-size:26px;color:#fff;
   background:linear-gradient(135deg,#f77f8a,#e64b6b);
 }
 .profile-big-av img{width:100%;height:100%;object-fit:cover;}
-.profile-info-name{font-family:'DM Serif Display',serif;font-size:20px;}
+.profile-info-name{font-family:'Lora',serif;font-weight:600;font-size:20px;}
 .profile-info-sub{font-size:13px;color:var(--text2);}
 .stat-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .stat-card{
@@ -504,7 +572,7 @@ body::before {
   box-shadow:var(--shadow-sm); /* REDESIGN */
   border-radius:var(--r);padding:14px;text-align:center;
 }
-.stat-num{font-family:'DM Serif Display',serif;font-size:28px;color:var(--accent);}
+.stat-num{font-family:'Lora',serif;font-weight:600;font-size:28px;color:var(--accent);}
 .stat-lbl{font-size:11px;color:var(--text2);margin-top:2px;}
 
 /* ---- BOTTOM NAV ---- */
@@ -538,7 +606,7 @@ body::before {
 #s-chats .body::-webkit-scrollbar{width:3px}
 #s-chats .body::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
 .chats-header{padding:16px 20px 8px;flex-shrink:0;}
-.chats-title{font-family:'DM Serif Display',serif;font-size:22px;}
+.chats-title{font-family:'Lora',serif;font-weight:600;font-size:22px;}
 .chats-sub{font-size:13px;color:var(--text2);margin-top:2px;}
 .chat-list{display:flex;flex-direction:column;flex:1;}
 /* Riga con swipe-to-delete: pulsante "Elimina" dietro, item che scorre a sinistra */
@@ -559,7 +627,7 @@ body::before {
 .chat-list-av{
   width:48px;height:48px;border-radius:50%;flex-shrink:0;overflow:hidden;
   display:flex;align-items:center;justify-content:center;
-  font-family:'DM Serif Display',serif;font-size:18px;color:#fff;
+  font-family:'Lora',serif;font-weight:600;font-size:18px;color:#fff;
   background:linear-gradient(135deg,#f77f8a,#e64b6b);
   position:relative;
 }
@@ -586,7 +654,7 @@ body::before {
   gap:12px;padding:40px 24px;text-align:center;
 }
 .chats-empty .empty-icon{font-size:48px;opacity:0.4;}
-.chats-empty .empty-title{font-family:'DM Serif Display',serif;font-size:18px;color:var(--text2);}
+.chats-empty .empty-title{font-family:'Lora',serif;font-weight:600;font-size:18px;color:var(--text2);}
 .chats-empty .empty-sub{font-size:14px;color:var(--text3);line-height:1.5;}
 /* ===== REDESIGN: skeleton loading lista chat (al posto di "Caricamento…") ===== */
 .skel-row{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:0.5px solid var(--border);}
@@ -675,7 +743,7 @@ body::before {
   width: 52px; height: 52px; border-radius: 50%;
   background: linear-gradient(135deg,#f77f8a,#e64b6b);
   display: flex; align-items: center; justify-content: center;
-  font-family: 'DM Serif Display', serif; font-size: 20px; color: #fff;
+  font-family: 'Lora', serif; font-weight:600; font-size: 20px; color: #fff;
   flex-shrink: 0; overflow: hidden;
   box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent);
 }
@@ -786,7 +854,7 @@ body::before {
   100%{width:160px;height:160px;opacity:0;}
 }
 .accepted-title {
-  font-family:'DM Serif Display',serif;
+  font-family:'Lora',serif;font-weight:600;
   font-size:30px;text-align:center;line-height:1.2;
 }
 .accepted-title em{color:var(--accent);font-style:italic;}
@@ -795,7 +863,7 @@ body::before {
 .accepted-av{
   width:56px;height:56px;border-radius:50%;overflow:hidden;
   display:flex;align-items:center;justify-content:center;
-  font-family:'DM Serif Display',serif;font-size:20px;color:#fff;
+  font-family:'Lora',serif;font-weight:600;font-size:20px;color:#fff;
   border:3px solid var(--surface);
 }
 
@@ -809,17 +877,17 @@ body::before {
 .waiting-resp-av {
   width:90px;height:90px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  font-family:'DM Serif Display',serif;font-size:32px;color:#fff;
+  font-family:'Lora',serif;font-weight:600;font-size:32px;color:#fff;
   background:linear-gradient(135deg,#f77f8a,#e64b6b);
   position:relative;
   box-shadow:0 0 0 4px rgba(255,77,109,0.15);
   animation:waitPulse 2s infinite;
 }
 @keyframes waitPulse{0%,100%{box-shadow:0 0 0 4px rgba(255,77,109,0.15)}50%{box-shadow:0 0 0 12px rgba(255,77,109,0.05)}}
-.waiting-resp-title{font-family:'DM Serif Display',serif;font-size:22px;text-align:center;line-height:1.3;}
+.waiting-resp-title{font-family:'Lora',serif;font-weight:600;font-size:22px;text-align:center;line-height:1.3;}
 .waiting-resp-sub{font-size:13px;color:var(--text2);text-align:center;line-height:1.6;}
 .waiting-resp-timer{
-  font-family:'DM Serif Display',serif;font-size:48px;
+  font-family:'Lora',serif;font-weight:600;font-size:48px;
   color:var(--accent);font-weight:700;
 }
 
@@ -834,13 +902,34 @@ body::before {
 }
 .report-btn:hover{border-color:var(--accent);color:var(--accent);}
 
-/* ---- FILTRI PROFILO ---- */
-.filter-section{display:flex;flex-direction:column;gap:10px;}
-.filter-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-.filter-row label{font-size:13px;color:var(--text2);flex-shrink:0;}
-.range-wrap{display:flex;align-items:center;gap:8px;flex:1;}
-.range-wrap input[type=range]{flex:1;accent-color:var(--accent);}
-.range-val{font-size:12px;color:var(--accent);font-weight:500;min-width:32px;text-align:right;}
+/* ---- FILTRI PROFILO (redesign: stile impostazioni + slider custom coerente) ---- */
+.filter-section{display:flex;flex-direction:column;gap:16px;}
+.filter-row{display:flex;flex-direction:column;gap:9px;}
+.filter-head{display:flex;align-items:center;justify-content:space-between;}
+.filter-row label, .filter-lbl{font-size:13.5px;font-weight:500;color:var(--text);}
+/* Valore come pill accent-tint */
+.range-val{
+  font-size:12.5px;font-weight:700;color:var(--accent);
+  background:rgba(255,77,109,0.10);border-radius:20px;padding:3px 11px;
+  font-variant-numeric:tabular-nums;min-width:42px;text-align:center;
+}
+/* Slider custom: track sottile arrotondato, riempimento accent (via --fill), thumb bianco con bordo */
+.filter-row input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:6px;margin:6px 0;
+  background:linear-gradient(var(--accent),var(--accent)) no-repeat, var(--surface3);
+  background-size:var(--fill,50%) 100%, 100% 100%;cursor:pointer;
+}
+.filter-row input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;
+  border:2.5px solid var(--accent);box-shadow:0 2px 6px rgba(0,0,0,0.16);cursor:grab;transition:transform .1s;
+}
+.filter-row input[type=range]:active::-webkit-slider-thumb{transform:scale(1.12);cursor:grabbing;}
+.filter-row input[type=range]::-moz-range-track{height:6px;border-radius:6px;background:var(--surface3);}
+.filter-row input[type=range]::-moz-range-progress{height:6px;border-radius:6px;background:var(--accent);}
+.filter-row input[type=range]::-moz-range-thumb{
+  width:22px;height:22px;border:2.5px solid var(--accent);border-radius:50%;background:#fff;
+  box-shadow:0 2px 6px rgba(0,0,0,0.16);cursor:grab;
+}
 
 /* ---- VERIFICA EMAIL ---- */
 .verify-banner{
@@ -949,23 +1038,43 @@ body::before {
 }
 #userProfileModal .up-hero img{width:100%;height:100%;object-fit:cover;cursor:zoom-in;}
 #userProfileModal .up-noimg{width:100%;height:100%;display:flex;align-items:center;
-  justify-content:center;font-family:'DM Serif Display',serif;font-size:72px;color:#fff;background:var(--accent);}
+  justify-content:center;font-family:'Lora',serif;font-weight:600;font-size:72px;color:#fff;background:var(--accent);}
 #userProfileModal .up-overlay{
   position:absolute;left:0;right:0;bottom:0;padding:26px 18px 14px;color:#fff;
   background:linear-gradient(transparent, rgba(0,0,0,0.78));pointer-events:none;
 }
-#userProfileModal .up-hname{font-family:'DM Serif Display',serif;font-size:26px;line-height:1.1;}
+#userProfileModal .up-hname{font-family:'Lora',serif;font-weight:600;font-size:26px;line-height:1.1;}
 #userProfileModal .up-meta{font-size:13px;opacity:.95;margin-top:5px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
 #userProfileModal .up-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;box-shadow:0 0 0 2px rgba(255,255,255,.25);}
 #userProfileModal .up-gallery{display:flex;gap:8px;margin-top:10px;}
 #userProfileModal .up-gallery .gthumb{flex:1;max-width:130px;aspect-ratio:1;border-radius:12px;overflow:hidden;cursor:zoom-in;background:var(--surface2);}
 #userProfileModal .up-gallery .gthumb img{width:100%;height:100%;object-fit:cover;}
-#userProfileModal .up-sec{margin-top:20px;}
-#userProfileModal .up-label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--text2);margin-bottom:7px;}
-#userProfileModal .up-bio{font-size:14.5px;color:var(--text);line-height:1.6;white-space:pre-wrap;}
-#userProfileModal .up-why{background:var(--surface);border:0.5px solid var(--border);border-radius:14px;
-  padding:14px 16px;font-size:14px;color:var(--text);line-height:1.55;font-style:italic;}
-#userProfileModal .up-audiocard{background:var(--surface);border:0.5px solid var(--border);border-radius:14px;padding:12px 14px;}
+/* REDESIGN (stile Hinge): scheda attributi = card con righe icona line-art + divisori sottili */
+#userProfileModal .up-attrs{
+  margin-top:14px;background:var(--surface);border:0.5px solid var(--border);
+  border-radius:18px;overflow:hidden;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.04));
+}
+#userProfileModal .up-attr{
+  display:flex;align-items:center;gap:15px;padding:15px 17px;
+  font-size:15.5px;color:var(--text);font-weight:500;
+}
+#userProfileModal .up-attr + .up-attr{border-top:0.5px solid var(--border);}
+#userProfileModal .up-attr svg{width:21px;height:21px;flex-shrink:0;color:var(--text2);}
+/* Sezioni "prompt": label piccola maiuscola + contenuto in card bianca arrotondata */
+#userProfileModal .up-sec{margin-top:18px;}
+#userProfileModal .up-label{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--text2);margin-bottom:9px;font-weight:600;}
+#userProfileModal .up-bio{
+  background:var(--surface);border:0.5px solid var(--border);border-radius:18px;
+  padding:16px 18px;font-size:15px;color:var(--text);line-height:1.6;white-space:pre-wrap;
+  box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.04));
+}
+/* "Perché usciresti con me" = prompt valorizzato: risposta serif grande (come Hinge) */
+#userProfileModal .up-why{
+  background:var(--surface);border:0.5px solid var(--border);border-radius:18px;
+  padding:18px 20px;font-family:'Lora',serif;font-weight:600;font-size:21px;color:var(--text);line-height:1.3;
+  box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.04));
+}
+#userProfileModal .up-audiocard{background:var(--surface);border:0.5px solid var(--border);border-radius:18px;padding:14px 16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.04));}
 #userProfileModal .up-audiocard audio{width:100%;margin-top:8px;}
 
 /* ---- AUDIO: recorder + player ---- */
@@ -1030,7 +1139,7 @@ body::before {
 .tut-slide{ display:none; text-align:center; max-width:340px; }
 .tut-slide.active{ display:block; animation:slideUp .28s ease; }
 .tut-icon{ font-size:76px; margin-bottom:20px; }
-.tut-title{ font-family:'DM Serif Display',serif; font-size:27px; line-height:1.2; margin-bottom:12px; }
+.tut-title{ font-family:'Lora',serif;font-weight:600; font-size:27px; line-height:1.2; margin-bottom:12px; }
 .tut-text{ font-size:15px; color:var(--text2); line-height:1.55; }
 .tut-dots{ display:flex; gap:8px; justify-content:center; margin-bottom:18px; }
 .tut-dot{ width:8px; height:8px; border-radius:50%; background:var(--surface3); transition:all .2s; }
@@ -1040,7 +1149,7 @@ body::before {
 /* Pagina Guida / Come funziona */
 #s-guide .body{ flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:18px; }
 #s-guide .body::-webkit-scrollbar{ width:3px }
-.guide-h{ font-family:'DM Serif Display',serif; font-size:18px; margin-bottom:6px; }
+.guide-h{ font-family:'Lora',serif;font-weight:600; font-size:18px; margin-bottom:6px; }
 #s-guide p{ font-size:14px; color:var(--text2); line-height:1.6; }
 </style>
 <script>
@@ -1071,6 +1180,8 @@ body::before {
       </div>
     </div>
     <div class="up-gallery" id="upGallery" style="display:none"></div>
+    <!-- REDESIGN (Hinge): scheda attributi con icone line-art + divisori, popolata da JS -->
+    <div class="up-attrs" id="upAttrs" style="display:none"></div>
     <div class="up-sec" id="upBioSec" style="display:none">
       <div class="up-label">Bio</div>
       <div class="up-bio" id="upBio"></div>
@@ -1082,8 +1193,8 @@ body::before {
     <div class="up-sec" id="upAudioSec" style="display:none">
       <div class="up-label">La sua voce</div>
       <div class="up-audiocard">
-        <div id="upAudioQ" style="font-size:13px;color:var(--text2);"></div>
-        <audio id="upAudioPlayer" controls preload="none"></audio>
+        <div id="upAudioQ" style="font-size:13px;color:var(--text2);margin-bottom:8px;"></div>
+        <div id="upAudioMount"></div>
       </div>
     </div>
   </div>
@@ -1091,7 +1202,7 @@ body::before {
 
 <!-- LOADING -->
 <div id="loading">
-  <div style="font-family:'DM Serif Display',serif;font-size:28px;">Live<span style="color:#ff4d6d;font-style:italic;">Match</span></div>
+  <div style="font-family:'Lora',serif;font-weight:600;font-size:28px;">Live<span style="color:#ff4d6d;font-style:italic;">Match</span></div>
   <div class="spinner"></div>
 </div>
 
@@ -1100,7 +1211,7 @@ body::before {
 <div id="appGate" style="display:none;position:fixed;inset:0;z-index:99999;background:var(--bg);
      flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;gap:14px;">
   <div id="appGateEmoji" style="font-size:52px;">🛠️</div>
-  <div id="appGateTitle" style="font-family:'DM Serif Display',serif;font-size:24px;"></div>
+  <div id="appGateTitle" style="font-family:'Lora',serif;font-weight:600;font-size:24px;"></div>
   <div id="appGateMsg" style="font-size:15px;color:var(--text2);max-width:340px;line-height:1.5;"></div>
   <button id="appGateBtn" class="btn-primary" style="display:none;max-width:280px;margin-top:8px;"
      onclick="window.open('https://apps.apple.com/app/livematch','_blank')">Aggiorna l'app</button>
@@ -1201,6 +1312,18 @@ body::before {
     </div>
   </div>
 
+  <!-- POPUP RICHIESTE IN CONTEMPORANEA (chooser) -->
+  <div class="popup-bg" id="popupChooser">
+    <div class="popup-card">
+      <div class="popup-emoji">🔥</div>
+      <div class="popup-title">Insegnami a essere come te!</div>
+      <div class="popup-sub" id="chooserSub">Hai più richieste di match in contemporanea. Scegli tu tra i possibili match, oppure lascia al caso.</div>
+      <div id="chooserAvatars" style="display:flex;justify-content:center;gap:8px;margin:4px 0 2px;"></div>
+      <button class="btn-primary" onclick="chooserBrowse()">👀 Sfoglia le richieste</button>
+      <button class="btn-secondary" onclick="chooserRandom()">🎲 Lascia al caso</button>
+    </div>
+  </div>
+
   <!-- POPUP FOTO SCADUTA -->
   <div class="popup-bg" id="popupPhotoExp">
     <div class="popup-card">
@@ -1248,7 +1371,7 @@ body::before {
       </div>
       <!-- REDESIGN: brand moment — la metà bassa dello schermo era vuota -->
       <div style="margin-top:auto;text-align:center;padding:24px 0 10px;">
-        <div style="font-family:'DM Serif Display',serif;font-size:19px;color:var(--text2);line-height:1.4;">
+        <div style="font-family:'Lora',serif;font-weight:600;font-size:19px;color:var(--text2);line-height:1.4;">
           Persone vere,<br/><span style="color:var(--accent);font-style:italic;">online proprio adesso</span>.
         </div>
       </div>
@@ -1348,7 +1471,7 @@ body::before {
         <div class="audio-rec">
           <button type="button" class="audio-btn" id="regRecBtn" onclick="toggleRec('reg')">🎤 Registra risposta</button>
           <div class="audio-timer-lbl" id="regRecTimer" style="display:none">15s</div>
-          <audio id="regAudioPlayer" controls style="display:none"></audio>
+          <div id="regAudioMount" style="display:none"></div>
           <button type="button" class="link-btn" id="regRecRedo" style="display:none" onclick="redoRec('reg')">↺ Ri-registra</button>
         </div>
       </div>
@@ -1440,9 +1563,13 @@ body::before {
            dentro una card grigia. Ora: foto 4:5 a tutta larghezza, nome+età in
            overlay serif su gradiente, timer sopra la foto. Gli id sono INVARIATI
            (renderMatchScreen non sa che è cambiato qualcosa). -->
-      <div class="hero-card">
+      <!-- COMPATTA (stile Hinge): card foto + pulsanti subito visibili. Tap sulla foto → dettagli. -->
+      <div class="hero-card" onclick="openMatchDetails()">
         <div class="hero-photo" id="matchAv"></div>
         <div class="hero-fade"></div>
+        <div class="hero-hint">ⓘ Tocca per i dettagli</div>
+        <!-- Badge: l'altra persona ti ha già richiesto match mentre eri sulla sua card -->
+        <div class="hero-incoming" id="heroIncoming" style="display:none">💘 Ti ha già chiesto un match</div>
         <div class="hero-info">
           <div class="hero-name" id="matchName">—</div>
           <div class="profile-meta">
@@ -1461,22 +1588,32 @@ body::before {
           </svg>
         </div>
       </div>
-      <div class="match-details">
+      <!-- Dettagli (bio/voce/foto extra) NON inline: si aprono nel modale toccando la foto.
+           Restano nel DOM (nascosti) perché renderMatchScreen li popola; il modale usa upBio/upWhy/… -->
+      <div class="match-details" style="display:none">
         <div style="font-size:14px;color:var(--text2);text-align:center;line-height:1.5;" id="matchBio"></div>
         <div class="profile-why" id="matchWhy" style="display:none"></div>
         <div class="profile-gallery" id="matchGallery" style="display:none"></div>
         <div class="profile-audio" id="matchAudio" style="display:none">
           <div class="pa-q" id="matchAudioQ"></div>
-          <audio id="matchAudioPlayer" controls preload="none"></audio>
+          <div id="matchAudioMount"></div>
         </div>
       </div>
       <!-- Azioni normali -->
       <div id="matchActionsNormal">
+        <!-- Nota simpatica quando la persona che guardo mi ha già richiesto match -->
+        <div class="incoming-note" id="incomingNote" style="display:none">💘 Questa fantastica persona a quanto pare ti aveva appena richiesto un match — che farai?</div>
         <div class="actions-row">
           <button class="btn-reject" onclick="rejectMatch()">✕ Rifiuta</button>
           <button class="btn-accept" id="matchAcceptBtn" onclick="acceptMatch()">💘 Richiedi match</button>
         </div>
-        <button class="btn-photo" onclick="requestPhoto()" style="margin-top:10px">📸 Chiedi una foto dal vivo</button>
+        <button class="btn-photo" onclick="requestPhoto()" style="margin-top:12px">
+          <span class="bp-ic">📸</span>
+          <span class="bp-txt">
+            <span class="bp-main">Chiedi una foto dal vivo</span>
+            <span class="bp-sub">Niente catfish: scopri chi è davvero, ora</span>
+          </span>
+        </button>
       </div>
       <!-- Azioni quando è una richiesta di foto in arrivo (Bug 2) -->
       <div id="matchActionsPhoto" style="display:none">
@@ -1590,7 +1727,7 @@ body::before {
       <div style="font-size:13px;color:var(--accent);font-weight:600;" id="photoReviewTimer">60s</div>
     </div>
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;">
-      <div style="font-family:'DM Serif Display',serif;font-size:20px;text-align:center;" id="photoReviewTitle">Foto dal vivo</div>
+      <div style="font-family:'Lora',serif;font-weight:600;font-size:20px;text-align:center;" id="photoReviewTitle">Foto dal vivo</div>
       <div style="font-size:13px;color:var(--text2);text-align:center;">Vuoi fare match con questa persona?</div>
       <div style="width:260px;height:260px;border-radius:var(--r2);overflow:hidden;border:0.5px solid var(--border2);">
         <img id="photoReviewImg" src="" style="width:100%;height:100%;object-fit:cover;"/>
@@ -1659,25 +1796,16 @@ body::before {
       <div class="section-label">Filtri di ricerca</div>
       <div class="filter-section">
         <div class="filter-row">
-          <label>Età min</label>
-          <div class="range-wrap">
-            <input type="range" id="editMinAge" min="18" max="99" value="18" oninput="document.getElementById('minAgeVal').textContent=this.value"/>
-            <span class="range-val" id="minAgeVal">18</span>
-          </div>
+          <div class="filter-head"><span class="filter-lbl">Età minima</span><span class="range-val" id="minAgeVal">18</span></div>
+          <input type="range" id="editMinAge" min="18" max="99" value="18" oninput="updateRange(this,'minAgeVal')"/>
         </div>
         <div class="filter-row">
-          <label>Età max</label>
-          <div class="range-wrap">
-            <input type="range" id="editMaxAge" min="18" max="99" value="99" oninput="document.getElementById('maxAgeVal').textContent=this.value"/>
-            <span class="range-val" id="maxAgeVal">99</span>
-          </div>
+          <div class="filter-head"><span class="filter-lbl">Età massima</span><span class="range-val" id="maxAgeVal">99</span></div>
+          <input type="range" id="editMaxAge" min="18" max="99" value="99" oninput="updateRange(this,'maxAgeVal')"/>
         </div>
         <div class="filter-row">
-          <label>Distanza max</label>
-          <div class="range-wrap">
-            <input type="range" id="editMaxDist" min="5" max="500" value="50" oninput="document.getElementById('maxDistVal').textContent=this.value+'km'"/>
-            <span class="range-val" id="maxDistVal">50km</span>
-          </div>
+          <div class="filter-head"><span class="filter-lbl">Distanza massima</span><span class="range-val" id="maxDistVal">50&thinsp;km</span></div>
+          <input type="range" id="editMaxDist" min="5" max="500" value="50" oninput="updateRange(this,'maxDistVal','km')"/>
         </div>
       </div>
 
@@ -1729,7 +1857,7 @@ body::before {
         <div class="audio-rec">
           <button type="button" class="audio-btn" id="editRecBtn" onclick="toggleRec('edit')">🎤 Registra risposta</button>
           <div class="audio-timer-lbl" id="editRecTimer" style="display:none">15s</div>
-          <audio id="editAudioPlayer" controls style="display:none"></audio>
+          <div id="editAudioMount" style="display:none"></div>
           <button type="button" class="link-btn" id="editRecRedo" style="display:none" onclick="redoRec('edit')">↺ Ri-registra / rimuovi</button>
         </div>
       </div>
@@ -1879,7 +2007,7 @@ body::before {
     <div class="body">
       <!-- Stato piano attuale -->
       <div style="text-align:center;">
-        <div style="font-family:'DM Serif Display',serif;font-size:24px;line-height:1.2;" id="plusPlanLabel">Piano Gratis</div>
+        <div style="font-family:'Lora',serif;font-weight:600;font-size:24px;line-height:1.2;" id="plusPlanLabel">Piano Gratis</div>
         <div style="font-size:14px;color:var(--text2);margin-top:2px;" id="plusLimitLabel">5 match al giorno</div>
         <div style="font-size:12px;color:var(--text3);margin-top:2px;" id="plusExpiry"></div>
       </div>
@@ -2054,7 +2182,7 @@ window._loadingFallback = setTimeout(function() {
 // ============================================================
 // ⚠️ AGGIORNARE A OGNI BUILD: deve combaciare con CURRENT_PROJECT_VERSION dell'app iOS.
 // Usato dal "forza aggiornamento" dell'admin (se APP_BUILD < min_build → schermata Aggiorna).
-const APP_BUILD = 12;
+const APP_BUILD = 16;
 const SUPABASE_URL = 'https://dmzozvidylvdaclzyeqk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtem96dmlkeWx2ZGFjbHp5ZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzgyODQsImV4cCI6MjA5NTQxNDI4NH0.dmdHfeoXrPHCpFzOMxoVo8TtTuj1M9KRPnOUWRMn2sE';
 
@@ -2071,6 +2199,10 @@ let matchedProfile = null;
 let sessionSeenIds = new Set(); // persone già proposte in questa sessione (Bug 1)
 let searchGen = 0; // "token" della ricerca: se annulli/navighi via, la ricerca in volo viene invalidata
 let incomingPhotoReq = false;   // true quando vedo il profilo di chi mi ha chiesto una foto (Bug 2)
+// La persona che sto guardando (dalla ricerca) mi ha appena mandato una richiesta match:
+// matchData della SUA richiesta in arrivo. Serve per rietichettare "Richiedi match" → "Accetta"
+// e mostrare il badge, senza disabilitare i pulsanti (trasparenza). Resettata a ogni renderMatchScreen.
+let pendingIncomingFromViewed = null;
 let matchTimer = null;
 let photoTimer = null;
 let photoSecs = 60;
@@ -2399,6 +2531,189 @@ let toastTimerInt = null;
 let toastSecs = 60;
 let toastMatchData = null; // { match, profile, type: 'match'|'photo' }
 
+// ============================================================
+// CODA RICHIESTE IN CONTEMPORANEA (Strato 2 — soluzione "coda")
+// ============================================================
+// Lo Strato 1 (server) nasconde dalla ricerca chi è in negoziazione, quindi le
+// richieste multiple sono rare: solo quelle già "in volo" nei 2-3s prima del
+// nascondimento. Qui le gestiamo a coda: se ne arriva una mentre ne stai già
+// valutando un'altra, NON sovrascrive il toast → entra in coda. Quando rifiuti
+// o scade quella corrente, compare la successiva. Quando ne ACCETTI una, le altre
+// vengono rifiutate subito (così i loro mittenti si liberano).
+let _reqQueue = []; // [{ profile, matchData }] richieste match in attesa
+let _chooserOpen = false;   // popup "richieste in contemporanea" aperto
+let _chooserTimer = null;   // tick che ripulisce le richieste scadute dal chooser
+
+const _MATCH_PHASES = ['s-match','s-photo','s-photo-review','s-waiting-response','s-accepted'];
+function _reqExpired(q) {
+  const ca = q && q.matchData && q.matchData.created_at;
+  return !!ca && (new Date(ca).getTime() + 35000) <= Date.now();
+}
+function _shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+
+function enqueueOrShowRequest(profile, matchData) {
+  if (!matchData || !matchData.id) return;
+  // Dedup contro toast corrente + coda
+  const cur = toastMatchData && toastMatchData.matchData && toastMatchData.matchData.id;
+  if (matchData.id === cur || _reqQueue.some(q => q.matchData.id === matchData.id)) return;
+
+  // Chooser già aperto → aggiungi al "pool" e aggiorna il conteggio
+  if (_chooserOpen) { _reqQueue.push({ profile, matchData }); updateChooser(); return; }
+
+  const active = document.querySelector('.screen.active');
+  // 's-searching' incluso: durante la ricerca le richieste si ACCODANO (niente toast
+  // fluttuante che resta sopra la schermata match/ricerca). Si ri-mostrano quando torni libero.
+  const inMatchFlow = active && (active.id === 's-searching' || _MATCH_PHASES.includes(active.id));
+
+  // CONTEMPORANEITÀ: c'è già un toast di MATCH a schermo (sono in home/ricerca, non dentro
+  // un flusso) e ne arriva un'altra → ESCALA al popup chooser ("scegli o lascia al caso").
+  if (toastMatchData && toastMatchData.type === 'match' && !inMatchFlow) {
+    _reqQueue.unshift({ profile: toastMatchData.profile, matchData: toastMatchData.matchData });
+    _reqQueue.push({ profile, matchData });
+    openChooser();
+    return;
+  }
+
+  // Sto già valutando una richiesta a tutto schermo, o c'è un toast (foto) → coda semplice.
+  if (toastMatchData || inMatchFlow) {
+    _reqQueue.push({ profile, matchData });
+    noteIncomingWhileViewing(profile, matchData); // badge + "Accetta" se è proprio chi sto guardando
+    return;
+  }
+
+  // Primo arrivo, schermo libero → toast normale.
+  showToast({ profile, type: 'match', matchData });
+}
+
+// ---- Popup "richieste in contemporanea" ----
+function _renderChooserAvatars(pool) {
+  const wrap = document.getElementById('chooserAvatars');
+  if (!wrap) return;
+  wrap.innerHTML = pool.slice(0, 5).map(q => {
+    const p = q.profile || {};
+    const inner = p.avatar_url
+      ? `<img src="${safeUrl(p.avatar_url)}" alt="${escapeHtml(p.name || '')}" style="width:100%;height:100%;object-fit:cover;"/>`
+      : escapeHtml((p.name || '?')[0].toUpperCase());
+    return `<div class="big-avatar" style="width:40px;height:40px;font-size:16px;border-width:2px;">${inner}</div>`;
+  }).join('');
+}
+function openChooser() {
+  const pool = _reqQueue.filter(q => !_reqExpired(q));
+  if (pool.length < 2) { _reqQueue = pool; if (pool.length === 1) { const o = pool[0]; _reqQueue = []; showToast({ profile: o.profile, type: 'match', matchData: o.matchData }); } return; }
+  dismissToast();
+  const _tw = document.getElementById('toastWrap'); if (_tw) _tw.innerHTML = ''; // rimuovi subito il toast (niente sovrapposizione col popup)
+  _chooserOpen = true;
+  updateChooser();
+  document.getElementById('popupChooser').classList.add('show');
+  if (_chooserTimer) clearInterval(_chooserTimer);
+  _chooserTimer = setInterval(updateChooser, 1000);
+}
+function updateChooser() {
+  if (!_chooserOpen) return;
+  // Scarta le richieste scadute dal pool
+  _reqQueue = _reqQueue.filter(q => !_reqExpired(q));
+  const n = _reqQueue.length;
+  if (n >= 2) {
+    const sub = document.getElementById('chooserSub');
+    if (sub) sub.innerHTML = `Hai <b>${n}</b> richieste di match in contemporanea. Scegli tu tra i possibili match, oppure lascia al caso.`;
+    _renderChooserAvatars(_reqQueue);
+  } else if (n === 1) {
+    // Tornata a una sola valida → niente chooser, mostra il toast normale
+    const one = _reqQueue.shift();
+    closeChooser();
+    showToast({ profile: one.profile, type: 'match', matchData: one.matchData });
+  } else {
+    closeChooser(); // tutte scadute
+  }
+}
+function closeChooser() {
+  _chooserOpen = false;
+  if (_chooserTimer) { clearInterval(_chooserTimer); _chooserTimer = null; }
+  const el = document.getElementById('popupChooser');
+  if (el) el.classList.remove('show');
+}
+// "Lascia al caso": ne propone UNA a sorte (le altre vengono rifiutate) → vai a decidere.
+function chooserRandom() {
+  const pool = _reqQueue.filter(q => !_reqExpired(q));
+  closeChooser();
+  if (!pool.length) { _reqQueue = []; return; }
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  _reqQueue = _reqQueue.filter(q => q.matchData.id !== pick.matchData.id);
+  rejectQueuedRequests(); // le altre richieste: rifiutate subito (così i mittenti si liberano)
+  enterRequestDecision(pick.profile, pick.matchData);
+}
+// "Sfoglia": le vedi tutte, in ordine casuale, una alla volta (rifiuta → prossima).
+function chooserBrowse() {
+  _reqQueue = _shuffle(_reqQueue.filter(q => !_reqExpired(q)));
+  closeChooser();
+  showNextRequest();
+}
+// Entra nella decisione del match (schermata profilo + timer 35s) per una richiesta in arrivo.
+// Stessa logica di toastViewProfile, riusabile anche dal chooser.
+function enterRequestDecision(profile, matchData) {
+  searchGen++; // ferma una eventuale ricerca in volo
+  currentMatch = matchData;
+  matchedProfile = profile;
+  incomingPhotoReq = false;
+  if (matchData && matchData.created_at) { matchDeadlineMs = new Date(matchData.created_at).getTime() + 35000; matchTotalSecs = 35; }
+  else matchDeadlineMs = 0;
+  renderMatchScreen(profile);
+  goTo('match');
+  startMatchTimer();
+}
+
+// Se la persona verso cui sto agendo (dalla ricerca) mi ha GIÀ richiesto un match
+// (richiesta in arrivo ancora viva), NON creo una nuova richiesta: rispondo alla SUA.
+// Evita il doppione e mantiene un solo flusso. Ritorna true se ho reindirizzato.
+async function _redirectToIncomingIfAny(otherId) {
+  if (!currentProfile || !otherId) return false;
+  const recentISO = new Date(Date.now() - 75000).toISOString();
+  const { data: rows } = await sb.from('match_requests')
+    .select('*')
+    .eq('from_user', otherId).eq('to_user', currentProfile.id)
+    .in('status', ['pending', 'photo_requested'])
+    .gte('created_at', recentISO)
+    .order('created_at', { ascending: true });
+  const incoming = rows && rows[0];
+  if (!incoming) return false;
+  // ✅ ANTI-DOPPIONE UI: la richiesta in arrivo di B può essere già rappresentata altrove
+  //    (toast visibile e/o copia in _reqQueue, accodata mentre ero sulla sua card). Se non
+  //    le rimuovo, dopo aver risposto riappaiono come "seconda richiesta" e il flusso si rompe.
+  //    Tengo UNA sola rappresentazione: la schermata di decisione qui sotto.
+  if (toastMatchData && toastMatchData.matchData &&
+      (toastMatchData.matchData.id === incoming.id ||
+       (toastMatchData.profile && toastMatchData.profile.id === otherId))) {
+    dismissToast();
+  }
+  _reqQueue = _reqQueue.filter(q => q.matchData &&
+    q.matchData.id !== incoming.id && q.matchData.from_user !== otherId);
+  const name = (matchedProfile && matchedProfile.name) ? matchedProfile.name : 'Questa persona';
+  miniToast('💘 ' + name + ' ti ha già chiesto un match — rispondi qui');
+  enterRequestDecision(matchedProfile, incoming);
+  return true;
+}
+
+// Mostra la prossima richiesta in coda, saltando quelle già scadute (35s dal created_at).
+function showNextRequest() {
+  while (_reqQueue.length) {
+    const next = _reqQueue.shift();
+    const ca = next.matchData && next.matchData.created_at;
+    if (ca && (new Date(ca).getTime() + 35000) <= Date.now()) continue; // già scaduta
+    showToast({ profile: next.profile, type: 'match', matchData: next.matchData });
+    return;
+  }
+}
+
+// Rifiuta nel DB tutte le richieste ancora in coda (quando l'utente ne sceglie una,
+// o abbandona): i mittenti ricevono "Match rifiutato" e si liberano subito.
+function rejectQueuedRequests() {
+  const q = _reqQueue.splice(0);
+  q.forEach(item => {
+    const id = item.matchData && item.matchData.id;
+    if (id) sb.from('match_requests').update({ status: 'rejected' }).eq('id', id).in('status', ['pending','photo_requested']).then(() => {}, () => {});
+  });
+}
+
 function showToast({ profile, type, matchData }) {
   // Rimuovi eventuale toast precedente
   dismissToast();
@@ -2474,7 +2789,7 @@ function showToast({ profile, type, matchData }) {
     if (timerEl) timerEl.textContent = toastSecs + 's';
     if (progressEl) progressEl.style.width = (toastSecs / toastTotal * 100) + '%';
     if (toastSecs <= 10 && timerEl) timerEl.style.color = '#ff8c00';
-    if (toastSecs <= 0) dismissToast();
+    if (toastSecs <= 0) { dismissToast(); showNextRequest(); }
   }, 1000);
 }
 
@@ -2484,10 +2799,10 @@ function dismissToast() {
   if (t) {
     t.classList.remove('show');
     t.classList.add('hide');
-    setTimeout(() => {
-      const wrap = document.getElementById('toastWrap');
-      if (wrap) wrap.innerHTML = '';
-    }, 400);
+    // ✅ FIX race: rimuovi SOLO questo toast (elemento catturato), non svuotare il
+    //    contenitore. Prima, se un NUOVO toast arrivava entro 400ms, il timer del
+    //    vecchio faceva wrap.innerHTML='' e cancellava anche quello nuovo.
+    setTimeout(() => { try { t.remove(); } catch (_) {} }, 400);
   }
   toastMatchData = null;
 }
@@ -2554,6 +2869,7 @@ function toastReject() {
   if (matchData && matchData.id) {
     sb.from('match_requests').update({ status: 'rejected' }).eq('id', matchData.id).then(() => {}, () => {});
   }
+  showNextRequest(); // se ce n'erano altre in contemporanea, mostra la successiva
 }
 
 function toastSendPhoto() {
@@ -2562,6 +2878,7 @@ function toastSendPhoto() {
   const { matchData, profile } = toastMatchData;
   currentMatch = matchData;
   matchedProfile = profile;
+  rejectQueuedRequests(); // hai scelto questa → libera gli altri mittenti
   dismissToast();
   document.getElementById('photoTitle').textContent = profile.name + ' ti ha chiesto una foto dal vivo! Scatta anche tu entro 60 secondi.';
   goTo('photo');
@@ -2658,21 +2975,20 @@ function openEditProfile() {
   resetRecUI('edit');
   editAudioExistingUrl = p.audio_url || null;
   if (p.audio_url) {
-    const player = document.getElementById('editAudioPlayer');
-    if (player) { player.src = p.audio_url; player.style.display = 'block'; }
+    showRecPreview('edit', p.audio_url);
     const btn = document.getElementById('editRecBtn');
     if (btn) btn.style.display = 'none';
     const redo = document.getElementById('editRecRedo');
     if (redo) redo.style.display = 'inline';
   }
 
-  // Precompila filtri
+  // Precompila filtri (updateRange aggiorna valore + riempimento accent dello slider)
   const minAgeEl = document.getElementById('editMinAge');
   const maxAgeEl = document.getElementById('editMaxAge');
   const maxDistEl = document.getElementById('editMaxDist');
-  if (minAgeEl) { minAgeEl.value = p.min_age || 18; document.getElementById('minAgeVal').textContent = p.min_age || 18; }
-  if (maxAgeEl) { maxAgeEl.value = p.max_age || 99; document.getElementById('maxAgeVal').textContent = p.max_age || 99; }
-  if (maxDistEl) { maxDistEl.value = p.max_distance || 50; document.getElementById('maxDistVal').textContent = (p.max_distance || 50) + 'km'; }
+  if (minAgeEl) { minAgeEl.value = p.min_age || 18; updateRange(minAgeEl, 'minAgeVal'); }
+  if (maxAgeEl) { maxAgeEl.value = p.max_age || 99; updateRange(maxAgeEl, 'maxAgeVal'); }
+  if (maxDistEl) { maxDistEl.value = p.max_distance || 50; updateRange(maxDistEl, 'maxDistVal', 'km'); }
 
   // Foto
   editPhotos = [null, null, null];
@@ -2814,6 +3130,16 @@ async function saveEditProfile() {
 // ============================================================
 // 4. NAVIGATION — goTo, navTo, popups
 // ============================================================
+// Slider filtri: aggiorna l'etichetta-valore e il riempimento accent (var --fill).
+function updateRange(el, valId, suffix) {
+  if (!el) return;
+  const min = +el.min, max = +el.max, v = +el.value;
+  const pct = max > min ? ((v - min) / (max - min)) * 100 : 0;
+  el.style.setProperty('--fill', pct + '%');
+  const lbl = document.getElementById(valId);
+  if (lbl) lbl.innerHTML = v + (suffix ? (' ' + suffix) : '');
+}
+
 function navTo(screen) {
   // Se stiamo lasciando la schermata di ricerca, annulla la ricerca in volo
   // (altrimenti la sua navigazione asincrona ti "rimbalza" via). Fix bug nav.
@@ -2910,7 +3236,7 @@ async function refreshChatNavBadge() {
     const { data: matches } = await sb.from('match_requests')
       .select('id').or('from_user.eq.' + currentProfile.id + ',to_user.eq.' + currentProfile.id)
       .eq('status', 'accepted');
-    if (!matches || !matches.length) { updateChatNavBadge(0); return; }
+    if (!matches || !matches.length) { updateChatNavBadge(0); applyBadgeCount(0); return; }
     const chatIds = matches.map(m => m.id);
     // ⚠️ order desc + limit ESPLICITI: senza ORDER BY, PostgREST tronca al cap di
     // default (1000) su righe ARBITRARIE → oltre quella soglia il conteggio dei non
@@ -2926,15 +3252,41 @@ async function refreshChatNavBadge() {
       if (new Date(m.created_at).getTime() > lr) unreadChats.add(m.chat_id);
     });
     updateChatNavBadge(unreadChats.size);
+    applyBadgeCount(unreadChats.size); // badge icona + contatore server = chat non lette reali
   } catch (_) {} finally { _navBadgeBusy = false; }
 }
 
-async function loadChatList() {
+// Live della LISTA chat: una chat risale in cima appena arriva un messaggio mentre la guardi.
+// La subscription è RLS-filtrata (ricevo solo i messaggi delle MIE chat) e ATTIVA SOLO mentre
+// la lista è a schermo (start/stop in goTo) → niente fanout globale persistente a scala.
+let _chatLiveChannel = null;
+let _chatLiveDebounce = null;
+function startChatLive() {
+  if (_chatLiveChannel || !currentProfile || !sb) return;
+  _chatLiveChannel = sb.channel('chatlist-live-' + currentProfile.id)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+      const active = document.querySelector('.screen.active');
+      if (!active || active.id !== 's-chats') return;
+      if (_chatLiveDebounce) clearTimeout(_chatLiveDebounce);
+      _chatLiveDebounce = setTimeout(() => loadChatList(true), 500); // refresh silenzioso, debounced
+    })
+    .subscribe();
+}
+function stopChatLive() {
+  if (_chatLiveDebounce) { clearTimeout(_chatLiveDebounce); _chatLiveDebounce = null; }
+  if (_chatLiveChannel) { try { sb.removeChannel(_chatLiveChannel); } catch (_) {} _chatLiveChannel = null; }
+}
+
+async function loadChatList(silent) {
   if (!currentProfile) return;
+  if (silent && loadChatList._busy) return; // evita refresh silenziosi sovrapposti
+  if (silent) loadChatList._busy = true;
   const list = document.getElementById('chatList');
+  const _prevScroll = silent ? list.scrollTop : 0; // refresh live: non far saltare lo scroll
   _chatListItems.clear();
-  // REDESIGN: skeleton invece del testo "Caricamento…" (percezione di velocità)
-  list.innerHTML = '<div class="skel-row"><div class="skel skel-av"></div><div class="skel-lines"><div class="skel skel-l1"></div><div class="skel skel-l2"></div></div></div>'.repeat(4);
+  // REDESIGN: skeleton invece del testo "Caricamento…" (percezione di velocità).
+  // In refresh silenzioso (live) NON mostro lo skeleton: aggiorno in place senza flicker.
+  if (!silent) list.innerHTML = '<div class="skel-row"><div class="skel skel-av"></div><div class="skel-lines"><div class="skel skel-l1"></div><div class="skel skel-l2"></div></div></div>'.repeat(4);
 
   // Carica tutti i match accettati
   const { data: matches, error } = await sb.from('match_requests')
@@ -2951,6 +3303,7 @@ async function loadChatList() {
         <div class="empty-sub">Fai un match live per iniziare a chattare!</div>
         <button class="btn-primary" style="width:200px;margin-top:8px" onclick="navTo('waiting')">Cerca un match</button>
       </div>`;
+    if (silent) loadChatList._busy = false;
     return;
   }
 
@@ -2978,6 +3331,10 @@ async function loadChatList() {
   (profRes.data || []).forEach(p => { profById[p.id] = p; });
   const lastByChat = {};
   (msgRes.data || []).forEach(m => { if (!lastByChat[m.chat_id]) lastByChat[m.chat_id] = m; }); // ordinati desc → il 1° è l'ultimo
+  // ✅ Ordina le chat per ATTIVITÀ più recente: ultimo messaggio (inviato o ricevuto); se la
+  // chat non ha ancora messaggi, si usa la data del match. La più recente in cima.
+  const _lastActivity = (m) => (lastByChat[m.id] ? new Date(lastByChat[m.id].created_at).getTime() : new Date(m.created_at).getTime());
+  rows.sort((a, b) => _lastActivity(b.match) - _lastActivity(a.match));
   // Conta i messaggi NON letti per chat: messaggi dell'altro utente arrivati dopo
   // l'ultima volta che ho aperto quella chat (stato in localStorage).
   const _reads = _getChatReads();
@@ -3060,6 +3417,7 @@ async function loadChatList() {
     frag.appendChild(row);
   }
   list.appendChild(frag);
+  if (silent) { list.scrollTop = _prevScroll; loadChatList._busy = false; }
 }
 
 // localStorage delle chat nascoste "solo per me" { chatId: ISO-occultamento }
@@ -3300,6 +3658,8 @@ function goTo(screen) {
   if (!el) { console.error('[LiveMatch] goTo: schermata inesistente:', screen); return; }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   el.classList.add('active');
+  // Live della lista chat solo mentre è a schermo (event-driven, niente fanout persistente).
+  if (screen === 'chats') startChatLive(); else stopChatLive();
 }
 
 function closePopup(id) {
@@ -3322,6 +3682,8 @@ function goHome() {
   currentMatch = null;
   matchedProfile = null;
   incomingPhotoReq = false;
+  closeChooser(); // chiudi il popup richieste in contemporanea se aperto
+  rejectQueuedRequests(); // torni in home senza scegliere → libera i mittenti in coda
   navTo('waiting');
   subscribeToMatches();
 }
@@ -3503,6 +3865,8 @@ async function doLogout() {
   currentMatch = null; matchedProfile = null;
   sessionSeenIds.clear();
   _chatMsgCache = {};
+  _reqQueue = []; // azzera la coda richieste del vecchio account
+  closeChooser();
   planState = null;
   searchGen++;
   goTo('auth');
@@ -3696,6 +4060,30 @@ function _imageToModerationBase64(blob) {
   });
 }
 
+// ⚡ Comprime un'immagine in un Blob JPEG (max 1024px) prima dell'upload: una foto della
+// fotocamera può pesare diversi MB → ridimensionata a ~100-200KB l'upload è molto più veloce
+// (meno attesa nello scambio foto). Fallback all'originale se qualcosa va storto.
+function _resizeImageToBlob(blob, maxDim = 1024, quality = 0.82) {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          let w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) { const s = maxDim / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          try { URL.revokeObjectURL(img.src); } catch (_) {}
+          c.toBlob((b) => resolve(b || blob), 'image/jpeg', quality);
+        } catch (_) { resolve(blob); }
+      };
+      img.onerror = () => resolve(blob);
+      img.src = URL.createObjectURL(blob);
+    } catch (_) { resolve(blob); }
+  });
+}
+
 // Verdetto: 'safe' | 'unsafe' | 'error'
 async function moderateImage(blob) {
   try {
@@ -3724,6 +4112,81 @@ async function checkImageThen(blob, onOk) {
 }
 
 // ============================================================
+// 6a-bis. VOICE PLAYER stile Hinge — pulsante play tondo + waveform a barre.
+// Componente riusabile: avvolge un <audio> (controlli nativi nascosti) con UI custom.
+// La waveform è decorativa ma DETERMINISTICA per url (hash → PRNG) così è stabile.
+// ============================================================
+const VP_PLAY_SVG  = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+const VP_PAUSE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h3v14H7zM14 5h3v14h-3z"/></svg>';
+let _vpCurrentAudio = null; // un solo vocale in riproduzione alla volta
+
+function _vpFmt(s){ s = Math.max(0, Math.floor(s || 0)); return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); }
+function _vpSeed(str){ let h = 2166136261 >>> 0; str = String(str || 'x'); for (let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+// Altezze "naturali": rumore lisciato sui vicini + leggera attenuazione alle estremità.
+function _vpHeights(seedStr, n){
+  let s = _vpSeed(seedStr) || 1;
+  const rnd = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+  const raw = []; for (let i=0;i<n;i++) raw.push(0.2 + 0.8*rnd());
+  const out = [];
+  for (let i=0;i<n;i++){
+    const a = raw[i-1] != null ? raw[i-1] : raw[i];
+    const b = raw[i+1] != null ? raw[i+1] : raw[i];
+    let v = (a + raw[i]*2 + b) / 4;
+    const edge = Math.min(i, n-1-i) / (n*0.5); // 0 ai bordi → 1 al centro
+    v *= 0.55 + 0.45*Math.min(1, edge*2.2);
+    out.push(Math.max(0.16, Math.min(1, v)));
+  }
+  return out;
+}
+function _vpSeedBars(wave, seedStr){
+  const bars = wave.querySelectorAll('.vp-bar');
+  const h = _vpHeights(seedStr, bars.length);
+  bars.forEach((b,i) => { b.style.height = Math.round(h[i]*100) + '%'; b.classList.remove('played'); });
+}
+function _vpProgress(wave, frac){
+  const bars = wave.querySelectorAll('.vp-bar');
+  const idx = Math.round(frac * bars.length);
+  bars.forEach((b,i) => b.classList.toggle('played', i < idx));
+}
+// Crea il player. Ritorna { wrap, audio }: il chiamante imposta audio.src quando pronto.
+function makeVoicePlayer(opts){
+  opts = opts || {};
+  const n = opts.bars || 36;
+  const wrap = document.createElement('div'); wrap.className = 'voice-player';
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'vp-play'; btn.setAttribute('aria-label','Riproduci'); btn.innerHTML = VP_PLAY_SVG;
+  const wave = document.createElement('div'); wave.className = 'vp-wave';
+  for (let i=0;i<n;i++){ const bar = document.createElement('span'); bar.className = 'vp-bar'; bar.style.height = '40%'; wave.appendChild(bar); }
+  const dur = document.createElement('span'); dur.className = 'vp-dur'; dur.textContent = '0:00';
+  const audio = document.createElement('audio'); audio.preload = 'metadata';
+  if (opts.audioId) audio.id = opts.audioId;
+  wrap.appendChild(btn); wrap.appendChild(wave); wrap.appendChild(dur); wrap.appendChild(audio);
+
+  let seeded = false;
+  const ensureSeed = () => { if (!seeded && audio.src){ _vpSeedBars(wave, audio.src); seeded = true; } };
+  audio.addEventListener('loadedmetadata', () => { ensureSeed(); if (isFinite(audio.duration)) dur.textContent = _vpFmt(audio.duration); });
+  audio.addEventListener('play', () => {
+    if (_vpCurrentAudio && _vpCurrentAudio !== audio) { try { _vpCurrentAudio.pause(); } catch(_){} }
+    _vpCurrentAudio = audio; btn.innerHTML = VP_PAUSE_SVG; btn.setAttribute('aria-label','Pausa');
+  });
+  const toPlay = () => { btn.innerHTML = VP_PLAY_SVG; btn.setAttribute('aria-label','Riproduci'); };
+  audio.addEventListener('pause', toPlay);
+  audio.addEventListener('ended', () => { toPlay(); _vpProgress(wave, 0); dur.textContent = isFinite(audio.duration) ? _vpFmt(audio.duration) : '0:00'; });
+  audio.addEventListener('timeupdate', () => {
+    if (!audio.duration || !isFinite(audio.duration)) return;
+    const frac = audio.currentTime / audio.duration;
+    _vpProgress(wave, frac); dur.textContent = _vpFmt(audio.currentTime);
+  });
+  btn.addEventListener('click', (e) => { e.stopPropagation(); ensureSeed(); if (audio.paused) audio.play().catch(()=>{}); else audio.pause(); });
+  wave.addEventListener('click', (e) => {
+    if (!audio.duration || !isFinite(audio.duration)) return;
+    const r = wave.getBoundingClientRect(); const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    audio.currentTime = frac * audio.duration;
+  });
+  return { wrap, audio };
+}
+
+// ============================================================
 // 6b. AUDIO — registrazione vocale (registrazione + modifica profilo)
 // ============================================================
 const audioBlobs = { reg: null, edit: null };   // blob registrato per contesto
@@ -3736,6 +4199,22 @@ function updateCharCount(inputId, counterId) {
   const inp = document.getElementById(inputId);
   const c = document.getElementById(counterId);
   if (inp && c) c.textContent = (inp.value.length) + '/30';
+}
+
+// Anteprima audio (creazione/modifica profilo) col player stile Hinge.
+// Monta un voice player nel contenitore #<ctx>AudioMount (id audio = <ctx>AudioPlayer).
+function showRecPreview(ctx, src) {
+  const mount = document.getElementById(ctx + 'AudioMount');
+  if (!mount) return;
+  mount.innerHTML = '';
+  const vp = makeVoicePlayer({ audioId: ctx + 'AudioPlayer', bars: 30 });
+  vp.audio.src = src;
+  mount.appendChild(vp.wrap);
+  mount.style.display = '';
+}
+function clearRecPreview(ctx) {
+  const mount = document.getElementById(ctx + 'AudioMount');
+  if (mount) { mount.innerHTML = ''; mount.style.display = 'none'; }
 }
 
 async function toggleRec(ctx) {
@@ -3764,8 +4243,7 @@ async function toggleRec(ctx) {
     const type = rec.mimeType || 'audio/webm';
     const blob = new Blob(_audioChunks[ctx], { type });
     audioBlobs[ctx] = blob;
-    const player = document.getElementById(ctx + 'AudioPlayer');
-    if (player) { player.src = URL.createObjectURL(blob); player.style.display = 'block'; }
+    showRecPreview(ctx, URL.createObjectURL(blob));
     const redo = document.getElementById(ctx + 'RecRedo');
     if (redo) redo.style.display = 'inline';
     const btn = document.getElementById(ctx + 'RecBtn');
@@ -3797,8 +4275,7 @@ function stopRec(ctx) {
 function redoRec(ctx) {
   audioBlobs[ctx] = null;
   if (ctx === 'edit') editAudioExistingUrl = null; // segnala rimozione/sostituzione
-  const player = document.getElementById(ctx + 'AudioPlayer');
-  if (player) { player.removeAttribute('src'); player.style.display = 'none'; }
+  clearRecPreview(ctx);
   const redo = document.getElementById(ctx + 'RecRedo');
   if (redo) redo.style.display = 'none';
   const btn = document.getElementById(ctx + 'RecBtn');
@@ -3824,8 +4301,7 @@ async function uploadAudio(ctx) {
 // Reset UI del recorder a stato vuoto (usato aprendo i form)
 function resetRecUI(ctx) {
   audioBlobs[ctx] = null;
-  const player = document.getElementById(ctx + 'AudioPlayer');
-  if (player) { player.removeAttribute('src'); player.style.display = 'none'; }
+  clearRecPreview(ctx);
   const redo = document.getElementById(ctx + 'RecRedo');
   if (redo) redo.style.display = 'none';
   const btn = document.getElementById(ctx + 'RecBtn');
@@ -3876,7 +4352,14 @@ async function setupPushNotifications() {
       Push.addListener('registrationError', function(e) { console.warn('[Push] registrationError', e); });
       // Tap su una notifica → vai in chat
       Push.addListener('pushNotificationActionPerformed', function(action) {
-        try { navTo('chats'); } catch(e) {}
+        // Routing per tipo di notifica: messaggio → lista chat; match/live/altro → home
+        // (una richiesta match, se ancora valida, arriva via realtime quando l'app è attiva;
+        // di norma con is_online=false in background non ne ricevi più da fuori).
+        try {
+          const data = (action && action.notification && action.notification.data) || {};
+          if (data.kind === 'message') navTo('chats');
+          else navTo('waiting');
+        } catch (e) {}
       });
     }
     let perm = await Push.checkPermissions();
@@ -3907,12 +4390,46 @@ function startHeartbeat() {
   }, 60000);
 }
 
-// Azzera il contatore badge sul server quando apri/riapri l'app. (Il numerino
-// sull'icona lo azzera nativamente AppDelegate in applicationDidBecomeActive.)
-function resetBadge() {
-  if (!currentUser) return;
-  sb.from('profiles').update({ badge_count: 0 }).eq('id', currentUser.id).then(() => {}, () => {});
+// Badge dell'icona app = numero REALE di chat non lette. Lo imposta il plugin nativo
+// (no-op su web). Tiene anche allineato profiles.badge_count, così quando l'app è chiusa
+// e arriva un nuovo push, send-push incrementa partendo dal numero giusto.
+let _lastUnreadCount = 0;   // ultimo conteggio chat non lette calcolato
+let _lastServerBadge = -1;  // ultimo valore scritto su badge_count (evita write inutili)
+// Proxy al plugin nativo Badge. ⚠️ Per un plugin CUSTOM, `Capacitor.Plugins.Badge` NON è
+// popolato: va ottenuto con `Capacitor.registerPlugin('Badge')`. Senza questo, setAppBadge
+// era un no-op silenzioso → il badge sull'icona non si azzerava mai (solo i push lo alzavano).
+let _badgePlugin;
+function _getBadgePlugin() {
+  if (_badgePlugin !== undefined) return _badgePlugin;
+  _badgePlugin = null;
+  try {
+    const Cap = window.Capacitor;
+    if (Cap && typeof Cap.registerPlugin === 'function') _badgePlugin = Cap.registerPlugin('Badge');
+    else if (Cap && Cap.Plugins && Cap.Plugins.Badge) _badgePlugin = Cap.Plugins.Badge;
+  } catch (_) { _badgePlugin = null; }
+  return _badgePlugin;
 }
+function setAppBadge(count) {
+  const n = Math.max(0, count | 0);
+  try {
+    const B = _getBadgePlugin();
+    if (B && B.set) { const r = B.set({ count: n }); if (r && r.catch) r.catch(() => {}); }
+  } catch (_) {}
+}
+function syncServerBadge(count) {
+  const n = Math.max(0, count | 0);
+  if (!currentUser || n === _lastServerBadge) return;
+  _lastServerBadge = n;
+  sb.from('profiles').update({ badge_count: n }).eq('id', currentUser.id).then(() => {}, () => {});
+}
+// Riallinea badge icona + contatore server al numero reale di chat non lette.
+function applyBadgeCount(count) {
+  _lastUnreadCount = Math.max(0, count | 0);
+  setAppBadge(_lastUnreadCount);
+  syncServerBadge(_lastUnreadCount);
+}
+// (ex resetBadge: NON azzera più. Il badge è gestito da refreshChatNavBadge/applyBadgeCount.)
+function resetBadge() { /* no-op: vedi applyBadgeCount */ }
 
 async function setupOnlinePresence() {
   if (!currentUser) return;
@@ -3965,6 +4482,7 @@ function handleVisibility() {
     // l'app, idem: offline entro 15 min (su iOS il force-quit non esegue codice).
     if (window._heartbeat) { clearInterval(window._heartbeat); window._heartbeat = null; }
     keepAlivePresence(); // last_seen = adesso (keepalive) → parte la finestra di 15 min
+    setAppBadge(_lastUnreadCount); // l'icona resta al numero reale di chat non lette
   } else if (document.visibilityState === 'visible' && currentUser) {
     // Torna in foreground: rimetti online + RIAVVIA il heartbeat
     sb.from('profiles')
@@ -3972,19 +4490,19 @@ function handleVisibility() {
       .eq('id', currentUser.id)
       .then(() => loadOnlineCount());
     startHeartbeat();
-    resetBadge(); // foreground → azzera il contatore notifiche
-    refreshChatNavBadge(); // aggiorna il badge "Chat" del menu
+    refreshChatNavBadge(); // foreground → ricalcola badge "Chat" menu + icona app (chat non lette)
     // Ri-registra/aggiorna il token push: garantisce notifiche affidabili (#4)
     setupPushNotifications();
   }
 }
 
 function keepAlivePresence() {
-  // Chiamata quando l'app va in background: scrive last_seen = ADESSO con keepalive
-  // (parte così la finestra di 15 min). is_online resta true. Usa keepalive fetch
-  // perché parte mentre l'app si sospende.
+  // Chiamata quando l'app va in BACKGROUND: scrive last_seen = ADESSO (così resti "online"
+  // in chat per ~15 min) ma is_online = FALSE → esci SUBITO dalla ricerca match (find_live_
+  // candidates richiede is_online): chi è fuori dall'app non riceve richieste da 35s che non
+  // potrebbe onorare. In foreground il heartbeat/visibility rimettono is_online = true.
   if (!currentUser) return;
-  const body = JSON.stringify({ is_online: true, last_seen: new Date().toISOString() });
+  const body = JSON.stringify({ is_online: false, last_seen: new Date().toISOString() });
   // L'Authorization usa il JWT della sessione (non l'anon key), altrimenti le RLS
   // bloccano l'UPDATE.
   const token = currentAccessToken || SUPABASE_ANON_KEY;
@@ -4031,6 +4549,19 @@ async function loadOnlineCount() {
 // ============================================================
 async function findMatch() {
   if (!currentProfile) return;
+
+  // ✅ Niente popup fluttuante durante la ricerca: se c'era un toast/chooser di richieste in
+  //    arrivo, spostalo in CODA e chiudilo. Si ri-mostra se rifiuti il candidato, o viene
+  //    rifiutato se ne accetti un altro. (Evita il popup che resta incollato in alto sul match.)
+  if (_chooserOpen) closeChooser();
+  if (toastMatchData) {
+    if (toastMatchData.type === 'match' && toastMatchData.matchData && toastMatchData.matchData.id) {
+      if (!_reqQueue.some(q => q.matchData.id === toastMatchData.matchData.id)) {
+        _reqQueue.unshift({ profile: toastMatchData.profile, matchData: toastMatchData.matchData });
+      }
+    }
+    dismissToast();
+  }
 
   // Controlla verifica email
   const verified = await checkEmailVerified();
@@ -4163,6 +4694,8 @@ function isCompatible(me, other) {
 }
 
 function renderMatchScreen(p) {
+  // Nuovo profilo a schermo → azzera l'eventuale "ti ha già chiesto" del precedente.
+  pendingIncomingFromViewed = null;
   const av = document.getElementById('matchAv');
   if (p.avatar_url) {
     av.innerHTML = `<img src="${safeUrl(p.avatar_url)}" alt="${escapeHtml(p.name)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`;
@@ -4200,17 +4733,19 @@ function renderMatchScreen(p) {
     }
   }
 
-  // Audio (domanda + risposta vocale)
+  // Audio (domanda + risposta vocale) — player stile Hinge montato nel contenitore.
   const audioWrap = document.getElementById('matchAudio');
-  const audioPlayer = document.getElementById('matchAudioPlayer');
+  const audioMount = document.getElementById('matchAudioMount');
   const audioQ = document.getElementById('matchAudioQ');
-  if (audioWrap && audioPlayer) {
+  if (audioWrap && audioMount) {
     if (p.audio_url) {
       audioQ.textContent = '🎤 ' + (p.audio_question || 'Ascolta la sua risposta');
-      audioPlayer.src = p.audio_url;
+      audioMount.innerHTML = '';
+      const vp = makeVoicePlayer({ audioId: 'matchAudioPlayer' });
+      vp.audio.src = p.audio_url; audioMount.appendChild(vp.wrap);
       audioWrap.style.display = 'flex';
     } else {
-      audioPlayer.removeAttribute('src');
+      audioMount.innerHTML = '';
       audioWrap.style.display = 'none';
     }
   }
@@ -4225,13 +4760,39 @@ function renderMatchScreen(p) {
   const topAlert = document.getElementById('matchTopAlert');
   if (topAlert) topAlert.style.display = incomingPhotoReq ? 'none' : '';
 
-  // Etichetta del pulsante: chi RICEVE una richiesta vede "Accetta",
-  // chi INIZIA (cerca e trova) vede "Richiedi match" (poi attende la conferma).
+  // Etichetta del pulsante + badge "ti ha già chiesto".
+  refreshAcceptLabel();
+}
+
+// Decide l'etichetta del pulsante accetta e la visibilità del badge sulla card.
+// "✓ Accetta" se: RICEVO una richiesta (currentMatch verso di me) OPPURE la persona che
+// sto guardando mi ha appena mandato una richiesta mentre ero sulla sua card
+// (pendingIncomingFromViewed). Altrimenti "💘 Richiedi match". Mai disabilitato.
+function refreshAcceptLabel() {
   const acceptBtn = document.getElementById('matchAcceptBtn');
-  if (acceptBtn) {
-    const amRecipient = !!(currentMatch && currentProfile && currentMatch.to_user === currentProfile.id);
-    acceptBtn.textContent = amRecipient ? '✓ Accetta' : '💘 Richiedi match';
-  }
+  const badge = document.getElementById('heroIncoming');
+  const hint = document.querySelector('#s-match .hero-hint');
+  const amRecipient = !!(currentMatch && currentProfile && currentMatch.to_user === currentProfile.id);
+  const incomingFromViewed = !!pendingIncomingFromViewed;
+  const note = document.getElementById('incomingNote');
+  if (acceptBtn) acceptBtn.textContent = (amRecipient || incomingFromViewed) ? '✓ Accetta' : '💘 Richiedi match';
+  if (badge) badge.style.display = incomingFromViewed ? '' : 'none';
+  if (hint) hint.style.display = incomingFromViewed ? 'none' : ''; // il badge ha priorità sull'hint
+  if (note) note.style.display = incomingFromViewed ? '' : 'none';
+}
+
+// Se la richiesta in arrivo è proprio dalla persona che sto guardando nella sua card
+// (l'ho trovata in ricerca e non ho ancora agito), rietichetto "Richiedi match" → "Accetta"
+// e mostro il badge. Trasparenza esplicita SENZA disabilitare i pulsanti: qualunque pulsante
+// premo, acceptMatch/requestPhoto reindirizzano comunque alla SUA richiesta (un solo flusso).
+function noteIncomingWhileViewing(profile, matchData) {
+  if (!matchData || !currentProfile || currentMatch || incomingPhotoReq) return;
+  const active = document.querySelector('.screen.active');
+  if (!active || active.id !== 's-match') return;
+  if (!matchedProfile || matchData.from_user !== matchedProfile.id) return; // non è chi guardo
+  if (matchData.to_user !== currentProfile.id) return;                      // non è per me
+  pendingIncomingFromViewed = matchData;
+  refreshAcceptLabel();
 }
 
 function openLightbox(url) {
@@ -4244,6 +4805,38 @@ function closeLightbox() {
   const lb = document.getElementById('lightbox');
   lb.classList.remove('show');
   document.getElementById('lightboxImg').src = '';
+}
+
+// REDESIGN (stile Hinge): icone line-art inline (stroke=currentColor) per la scheda attributi.
+const UP_ICONS = {
+  age:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V10"/><path d="M2 10a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M12 8V5"/><path d="M9 5a1.5 1.5 0 1 1 3 0c0-1-1.5-1.5-1.5-3"/></svg>',
+  orient: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v6a6 6 0 0 0 12 0V4"/><path d="M4 4h4"/><path d="M16 4h4"/><path d="M6 14v0M18 14v0"/></svg>',
+  seek:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+  gender: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M6 21a6 6 0 0 1 12 0"/></svg>',
+  city:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 21v-6h6v6"/></svg>'
+};
+const ORIENT_LABEL = { eterosessuale:'Etero', omosessuale:'Omosessuale', bisessuale:'Bisessuale' };
+const GENDER_LABEL = { uomo:'Uomo', donna:'Donna' };
+const SEEK_LABEL   = { uomo:'Cerca: uomini', donna:'Cerca: donne', tutti:'Cerca: tutti', entrambi:'Cerca: tutti' };
+function cap(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+// Costruisce le righe attributo solo per i campi davvero presenti (niente righe vuote).
+function renderProfileAttrs(p){
+  const box = document.getElementById('upAttrs');
+  if (!box) return;
+  const rows = [];
+  if (p.orientation) rows.push([UP_ICONS.orient, ORIENT_LABEL[p.orientation] || cap(p.orientation)]);
+  if (p.looking_for) rows.push([UP_ICONS.seek,   SEEK_LABEL[p.looking_for] || ('Cerca: ' + p.looking_for)]);
+  if (p.gender)      rows.push([UP_ICONS.gender,  GENDER_LABEL[p.gender] || cap(p.gender)]);
+  if (p.city)        rows.push([UP_ICONS.city,    escapeHtml(p.city)]);
+  if (!rows.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.innerHTML = rows.map(r => `<div class="up-attr">${r[0]}<span>${escapeHtml(String(r[1]))}</span></div>`).join('');
+  box.style.display = '';
+}
+
+// Tap sulla foto nella schermata match (card compatta) → apre il modale coi dettagli
+// (bio, foto extra, voce, "perché uscire con me"). Non tocca lo stato/timer del match.
+function openMatchDetails() {
+  if (matchedProfile) openUserProfileModal(matchedProfile);
 }
 
 // Modale profilo utente (read-only) — scheda profilo: foto grande + stato online +
@@ -4269,6 +4862,8 @@ function openUserProfileModal(p) {
     gal.innerHTML = extra.map(u => `<div class="gthumb" onclick="openLightbox('${safeUrl(u)}')"><img src="${safeUrl(u)}" alt="foto"/></div>`).join('');
     gal.style.display = 'flex';
   } else { gal.innerHTML = ''; gal.style.display = 'none'; }
+  // REDESIGN (Hinge): scheda attributi — righe icona line-art + divisori, solo per i campi presenti.
+  renderProfileAttrs(p);
   // Bio
   const bioSec = document.getElementById('upBioSec');
   if (p.bio) { document.getElementById('upBio').textContent = p.bio; bioSec.style.display = ''; }
@@ -4277,13 +4872,16 @@ function openUserProfileModal(p) {
   const whySec = document.getElementById('upWhySec');
   if (p.why_date_me) { document.getElementById('upWhy').textContent = p.why_date_me; whySec.style.display = ''; }
   else whySec.style.display = 'none';
-  // Voce
+  // Voce — player stile Hinge montato nel contenitore (id audio conservato per pause-by-id).
   const audioSec = document.getElementById('upAudioSec');
-  const aPlayer = document.getElementById('upAudioPlayer');
+  const aMount = document.getElementById('upAudioMount');
   if (p.audio_url) {
     document.getElementById('upAudioQ').textContent = '🎤 ' + (p.audio_question || 'Ascolta la sua risposta');
-    aPlayer.src = p.audio_url; audioSec.style.display = '';
-  } else { aPlayer.removeAttribute('src'); audioSec.style.display = 'none'; }
+    aMount.innerHTML = '';
+    const vp = makeVoicePlayer({ audioId: 'upAudioPlayer' });
+    vp.audio.src = p.audio_url; aMount.appendChild(vp.wrap);
+    audioSec.style.display = '';
+  } else { aMount.innerHTML = ''; audioSec.style.display = 'none'; }
   document.getElementById('userProfileModal').classList.add('show');
 }
 
@@ -4488,6 +5086,9 @@ async function expireMatch() {
   }
   currentMatch = null;
   matchedProfile = null;
+  // Se c'erano altre richieste in contemporanea in coda, mostra la successiva
+  // invece del popup "Tempo scaduto".
+  if (_reqQueue.length) { showNextRequest(); return; }
   showExpiredPopup();
 }
 
@@ -4518,6 +5119,10 @@ async function rejectMatch(autoSearch = true) {
   currentMatch = null;
   matchedProfile = null;
 
+  // Richieste in contemporanea rimaste in coda → mostra la successiva (precede sia la
+  // ricerca automatica sia il popup): "se rifiuti, compare la successiva".
+  if (_reqQueue.length) { showNextRequest(); return; }
+
   if (autoSearch) {
     // Continua automaticamente la ricerca saltando l'utente appena rifiutato
     goTo('searching');
@@ -4536,6 +5141,8 @@ async function acceptMatch() {
   sessionSeenIds.add(matchedProfile.id);
 
   if (!currentMatch) {
+    // Se A mi ha GIÀ richiesto → rispondo alla SUA richiesta (la mostro), niente doppione.
+    if (await _redirectToIncomingIfAny(matchedProfile.id)) return;
     // Controlla se esiste già un match_request RECENTE nei due sensi. ⚠️ Solo recente
     // (ultimi 75s): senza il filtro temporale, una richiesta vecchia rimasta 'pending'
     // (es. A aveva richiesto B e poi era scaduta/abbandonata) veniva AUTO-ACCETTATA
@@ -4675,6 +5282,7 @@ function showAcceptedScreen() {
   //    e navigava via SOVRASCRIVENDO la schermata "match accettato" → A non riceveva la
   //    notifica del match. (Bug #2)
   searchGen++;
+  rejectQueuedRequests(); // hai un match → rifiuta le altre richieste rimaste in coda
   // Match riuscito → riallinea il contatore dal server (l'iniziatore è stato scalato
   // dal trigger tg_charge_match_on_accept; l'altro resta invariato).
   if (currentProfile) {
@@ -4723,7 +5331,10 @@ function showAcceptedScreen() {
 // ============================================================
 async function requestPhoto() {
   if (!matchedProfile || !currentProfile) return;
+  // Se A mi ha GIÀ richiesto → rispondo alla SUA richiesta (la mostro), niente doppione foto.
+  if (!currentMatch && await _redirectToIncomingIfAny(matchedProfile.id)) return;
   stopMatchTimer();
+  rejectQueuedRequests(); // hai scelto questa persona → libera gli altri mittenti in coda
   // Hai interagito (richiesto una foto) → escludi da questa sessione.
   sessionSeenIds.add(matchedProfile.id);
 
@@ -4768,14 +5379,10 @@ async function requestPhoto() {
       .eq('id', currentMatch.id);
   }
 
-  // Crea photo request → B riceve toast via postgres_changes.
-  // Prendo il created_at (server) per impostare la SCADENZA CONDIVISA dello scambio foto:
-  // l'altro utente leggerà lo stesso created_at e conterà verso lo stesso istante.
-  const { data: prIns } = await sb.from('photo_requests').insert({
-    match_id: currentMatch.id,
-    from_user: currentProfile.id,
-    to_user: matchedProfile.id
-  }).select('created_at').maybeSingle();
+  // Crea (o riusa) la photo request → B riceve toast via postgres_changes.
+  // ✅ get-or-create a prova di corsa: con l'indice unico su match_id non si creano più
+  //    due righe per lo stesso scambio (era la causa di scambi foto "rotti").
+  const prIns = await getOrCreatePhotoReq(currentMatch.id, { from_user: currentProfile.id, to_user: matchedProfile.id });
   photoDeadlineMs = (prIns && prIns.created_at) ? new Date(prIns.created_at).getTime() + 60000 : (Date.now() + 60000);
 
   document.getElementById('photoTitle').textContent = 'Stai chiedendo una foto a ' + matchedProfile.name;
@@ -4859,6 +5466,20 @@ function handlePhotoCapture(e) {
   });
 }
 
+// Ritorna l'UNICA photo_requests del match, creandola se manca. A prova di corsa:
+// con l'indice unico su match_id un insert in conflitto NON duplica → rileggiamo la riga
+// esistente. Risolve gli scambi foto "rotti" da righe doppie.
+async function getOrCreatePhotoReq(matchId, createFields) {
+  if (!matchId) return null;
+  const q1 = await sb.from('photo_requests').select('*').eq('match_id', matchId).order('created_at', { ascending: true }).limit(1);
+  if (q1.data && q1.data[0]) return q1.data[0];
+  const ins = await sb.from('photo_requests').insert({ match_id: matchId, ...(createFields || {}) }).select('*').single();
+  if (!ins.error && ins.data) return ins.data;
+  // conflitto/corsa: la riga è stata creata nel frattempo → rileggi
+  const q2 = await sb.from('photo_requests').select('*').eq('match_id', matchId).order('created_at', { ascending: true }).limit(1);
+  return (q2.data && q2.data[0]) || null;
+}
+
 async function sendLivePhoto() {
   stopPhotoTimer();
   const btn = document.getElementById('btnSendPhoto');
@@ -4874,20 +5495,13 @@ async function sendLivePhoto() {
   try {
     console.log('[Photo] Uploading, matchId:', currentMatch.id);
 
-    const arrayBuffer = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(photoCapturedFile);
-    });
-
-    const mimeType = photoCapturedFile.type || 'image/jpeg';
-    const ext = mimeType.includes('png') ? 'png' : 'jpg';
-    const path = currentMatch.id + '/' + currentProfile.id + '-' + Date.now() + '.' + ext;
+    // ⚡ Comprime prima dell'upload → molto più veloce (meno attesa nello scambio).
+    const blobToUpload = await _resizeImageToBlob(photoCapturedFile);
+    const path = currentMatch.id + '/' + currentProfile.id + '-' + Date.now() + '.jpg';
 
     const { error: uploadError } = await sb.storage
       .from('live-photos')
-      .upload(path, arrayBuffer, { contentType: mimeType, upsert: true });
+      .upload(path, blobToUpload, { contentType: 'image/jpeg', upsert: true });
 
     if (uploadError) {
       console.error('[Photo] Upload error:', uploadError);
@@ -4896,38 +5510,28 @@ async function sendLivePhoto() {
 
     const { data: urlData } = sb.storage.from('live-photos').getPublicUrl(path);
     const myPhotoUrl = urlData.publicUrl;
-    console.log('[Photo] Uploaded OK:', myPhotoUrl);
 
-    // Carica il photo_request
-    const { data: photoReq } = await sb.from('photo_requests')
-      .select('*')
-      .eq('match_id', currentMatch.id)
-      .maybeSingle();
+    // Carica (o crea, a prova di corsa) l'UNICA photo_request del match.
+    const photoReq = await getOrCreatePhotoReq(currentMatch.id, {
+      from_user: currentProfile.id, to_user: matchedProfile?.id, requester_photo_url: myPhotoUrl
+    });
+    if (!photoReq) { console.error('[Photo] no photo_request row'); return; }
 
-    if (!photoReq) {
-      await sb.from('photo_requests').insert({
-        match_id: currentMatch.id,
-        from_user: currentProfile.id,
-        to_user: matchedProfile?.id,
-        requester_photo_url: myPhotoUrl
-      });
-      return;
-    }
-
+    // ⚡ Calcolo "entrambi inviato" LOCALMENTE dal merge (la riga letta ha già la foto
+    //    dell'altro se ha inviato prima) → niente SELECT extra dopo l'update.
     const iAmRequester = photoReq.from_user === currentProfile.id;
+    const merged = { ...photoReq };
+    if (iAmRequester) merged.requester_photo_url = myPhotoUrl; else merged.photo_url = myPhotoUrl;
+
+    // Scrivo il mio campo (await: così l'altro lo vede via realtime/poller).
     if (iAmRequester) {
-      await sb.from('photo_requests').update({ requester_photo_url: myPhotoUrl }).eq('id', photoReq.id);
+      if (!photoReq.requester_photo_url) await sb.from('photo_requests').update({ requester_photo_url: myPhotoUrl }).eq('id', photoReq.id);
     } else {
       await sb.from('photo_requests').update({ photo_url: myPhotoUrl }).eq('id', photoReq.id);
     }
 
-    // Controlla se entrambi hanno inviato
-    const { data: updated } = await sb.from('photo_requests').select('*').eq('id', photoReq.id).single();
-    const bothSent = updated && updated.photo_url && updated.requester_photo_url;
-    console.log('[Photo] Both sent:', bothSent);
-
-    if (bothSent) {
-      await openChatWithPhotos(updated);
+    if (merged.photo_url && merged.requester_photo_url) {
+      await openChatWithPhotos(merged); // ho appena chiuso il secondo invio → mostra subito
     }
 
   } catch(e) {
@@ -5003,26 +5607,24 @@ function goToWaitingPhoto() {
     } catch(e) {
       console.error('[PhotoPoller] error:', e);
     }
-  }, 5000); // ✅ 5s (era 1s)
+  }, 2000); // ⚡ 2s — meno attesa nello scambio foto
 }
 
 async function openChatWithPhotos(photoReq) {
-  // Aggiorna status a 'fulfilled' - entrambi hanno inviato
-  await sb.from('photo_requests').update({ status: 'fulfilled' }).eq('id', photoReq.id);
-
   if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
 
-  // Mostra la foto dell'ALTRO utente per decidere
+  // ⚡ Mostra SUBITO la foto dell'altro; segna 'fulfilled' in background (non blocca la review).
   const iAmRequester = photoReq.from_user === currentProfile.id;
   const otherPhotoUrl = iAmRequester ? photoReq.photo_url : photoReq.requester_photo_url;
-
   showPhotoReviewScreen(otherPhotoUrl, photoReq);
+
+  sb.from('photo_requests').update({ status: 'fulfilled' }).eq('id', photoReq.id).then(() => {}, () => {});
 }
 
 function showPhotoReviewScreen(photoUrl, photoReq) {
-  // Mostra schermata con foto dell'altro e timer 60s
+  // Mostra schermata con foto dell'altro e timer 60s — via Signed URL (bucket privato).
   const img = document.getElementById('photoReviewImg');
-  if (img) img.src = photoUrl;
+  if (img) { img.src = ''; resolveLivePhotoSrc(photoUrl).then(u => { if (u) img.src = u; }); }
 
   const title = document.getElementById('photoReviewTitle');
   if (title && matchedProfile) title.textContent = 'Foto di ' + matchedProfile.name;
@@ -5102,7 +5704,7 @@ async function acceptPhotoReview() {
           else endMatchFlow('expired');
         }
       } catch(e) {}
-    }, 5000); // ✅ 5s (era 1s)
+    }, 2000); // ⚡ 2s — meno attesa nello scambio foto
   }
 }
 
@@ -5207,6 +5809,8 @@ async function subscribeToMessages() {
   async function loadAllMessages() {
     const msgsArea = document.getElementById('messages');
     if (!msgsArea) return;
+    _stickBottom = true;      // apertura chat → si parte ancorati al fondo
+    _bindMsgsScroll();        // traccia se l'utente scrolla via dal fondo
 
     // Intestazione
     msgsArea.innerHTML = '';
@@ -5224,7 +5828,8 @@ async function subscribeToMessages() {
         if (!m.sender) m.sender = profileCache[m.sender_id];
         renderMessage(m, true); // batch: niente scroll per ogni messaggio
       }
-      msgsArea.scrollTop = msgsArea.scrollHeight;
+      scrollMessagesToBottom();
+      requestAnimationFrame(scrollMessagesToBottom); // dopo il layout
     }
 
     // Fetch fresco dal server (in background se c'era la cache)
@@ -5242,7 +5847,8 @@ async function subscribeToMessages() {
       renderMessage(m, true);
       added = true;
     }
-    if (added) msgsArea.scrollTop = msgsArea.scrollHeight;
+    if (added) { scrollMessagesToBottom(); requestAnimationFrame(scrollMessagesToBottom); }
+    else if (_stickBottom) requestAnimationFrame(scrollMessagesToBottom);
   }
 
   await loadAllMessages();
@@ -5306,6 +5912,46 @@ async function subscribeToMessages() {
 }
 
 
+// ✅ PRIVACY — Signed URL per il bucket PRIVATO live-photos.
+// Accetta sia un path (`<matchId>/file.ext`) sia un vecchio URL pubblico (estrae il path da
+// `/live-photos/…`). Restituisce un URL firmato a tempo, generabile SOLO dai partecipanti al
+// match (policy RLS). Cache locale per evitare di rifirmare ad ogni render.
+const _signedUrlCache = {}; // path -> { url, exp }
+async function resolveLivePhotoSrc(content) {
+  if (!content) return '';
+  let path = content;
+  const marker = '/live-photos/';
+  const i = content.indexOf(marker);
+  if (i >= 0) path = content.slice(i + marker.length);
+  else if (/^https?:\/\//i.test(content)) return content; // URL esterno (es. avatar pubblico) → invariato
+  path = path.split('?')[0];
+  const c = _signedUrlCache[path];
+  if (c && c.exp > Date.now() + 30000) return c.url;
+  try {
+    const { data } = await sb.storage.from('live-photos').createSignedUrl(path, 3600);
+    const url = (data && data.signedUrl) || '';
+    if (url) _signedUrlCache[path] = { url, exp: Date.now() + 3600 * 1000 };
+    return url;
+  } catch (_) { return ''; }
+}
+
+// ====== SCROLL CHAT: "stick to bottom" ======
+// Apriamo SEMPRE in fondo (ultimi messaggi). Problema risolto: foto/audio caricano via Signed
+// URL DOPO il render → allungano la chat e ti lasciavano "a metà". Soluzione: finché sei in
+// fondo (_stickBottom) si ri-scrolla quando i media finiscono di caricare; se hai scrollato su
+// per leggere lo storico, NON ti strappa via.
+let _stickBottom = true;
+function _msgsEl() { return document.getElementById('messages'); }
+function _msgsNearBottom() {
+  const m = _msgsEl(); if (!m) return true;
+  return (m.scrollHeight - m.scrollTop - m.clientHeight) < 90;
+}
+function scrollMessagesToBottom() { const m = _msgsEl(); if (m) { m.scrollTop = m.scrollHeight; _stickBottom = true; } }
+function _bindMsgsScroll() {
+  const m = _msgsEl(); if (!m || m._scrollBound) return; m._scrollBound = true;
+  m.addEventListener('scroll', () => { _stickBottom = _msgsNearBottom(); }, { passive: true });
+}
+
 function renderMessage(msg, noScroll) {
   const msgs = document.getElementById('messages');
   const isMe = msg.sender_id === currentProfile.id;
@@ -5315,7 +5961,7 @@ function renderMessage(msg, noScroll) {
     sys.className = 'sys-msg';
     sys.textContent = msg.content;
     msgs.appendChild(sys);
-    if (!noScroll) msgs.scrollTop = msgs.scrollHeight;
+    if (!noScroll && _stickBottom) scrollMessagesToBottom();
     return;
   }
 
@@ -5339,15 +5985,29 @@ function renderMessage(msg, noScroll) {
   const time = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
 
   if (msg.type === 'photo') {
-    bub.innerHTML = `<img src="${safeUrl(msg.content)}" style="max-width:180px;border-radius:10px;"/><div class="bubble-time">${time}</div>`;
+    // ✅ PRIVACY: il media live si carica via Signed URL (a tempo), non più URL pubblico.
+    // L'immagine È il messaggio: niente cornice/sfondo bolla, orario in overlay, tap per ingrandire.
+    bub.classList.add('bubble-media');
+    bub.innerHTML = `<div class="msg-photo"><img alt="foto"/><span class="msg-photo-time">${time}</span></div>`;
+    const _img = bub.querySelector('img');
+    // Quando la foto è caricata cresce l'altezza → se sei in fondo, ri-scrolla in fondo.
+    _img.addEventListener('load', () => { if (_stickBottom) scrollMessagesToBottom(); });
+    resolveLivePhotoSrc(msg.content).then(u => { if (u && _img) { _img.src = u; _img.onclick = () => openLightbox(u); } });
   } else if (msg.type === 'audio') {
-    bub.innerHTML = `<audio controls preload="none" src="${safeUrl(msg.content)}" style="max-width:210px;height:40px;vertical-align:middle;"></audio><div class="bubble-time">${time}</div>`;
+    // Player vocale stile Hinge (pulsante tondo + waveform). Src via Signed URL (a tempo).
+    const vp = makeVoicePlayer({ bars: 32 });
+    bub.appendChild(vp.wrap);
+    const tEl = document.createElement('div'); tEl.className = 'bubble-time'; tEl.textContent = time; bub.appendChild(tEl);
+    vp.audio.addEventListener('loadedmetadata', () => { if (_stickBottom) scrollMessagesToBottom(); });
+    resolveLivePhotoSrc(msg.content).then(u => { if (u && vp.audio) vp.audio.src = u; });
   } else {
     bub.innerHTML = escapeHtml(msg.content) + `<div class="bubble-time">${time}</div>`;
   }
   row.appendChild(bub);
   msgs.appendChild(row);
-  if (!noScroll) msgs.scrollTop = msgs.scrollHeight;
+  // Scrolla in fondo per i MIEI messaggi sempre; per quelli in arrivo solo se sei già in fondo
+  // (così non ti strappa via mentre rileggi lo storico).
+  if (!noScroll && (isMe || _stickBottom)) scrollMessagesToBottom();
 }
 
 async function sendMessage() {
@@ -5557,8 +6217,7 @@ let typingTimeout = null;
 function showTyping() {
   const row = document.getElementById('typingRow');
   if (row) row.classList.add('show');
-  const msgs = document.getElementById('messages');
-  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  if (_stickBottom) scrollMessagesToBottom();
   if (typingTimeout) clearTimeout(typingTimeout);
   typingTimeout = setTimeout(hideTyping, 3000);
 }
@@ -5597,6 +6256,8 @@ function endMatchFlow(status) {
   if (window._photoReviewTimer) { clearInterval(window._photoReviewTimer); window._photoReviewTimer = null; }
   try { if (typeof dismissToast === 'function') dismissToast(); } catch (_) {}
   currentMatch = null; matchedProfile = null; incomingPhotoReq = false;
+  // Se ho ancora richieste in contemporanea in coda, mostra la successiva invece del popup.
+  if (_reqQueue.length) { showNextRequest(); return; }
   if (showPopup) {
     if (status === 'expired') document.getElementById('popupExpired').classList.add('show');
     else document.getElementById('popupReject').classList.add('show');
@@ -5656,11 +6317,8 @@ async function subscribeToMatches() {
       //    tug-of-war sullo stato) e nessuno mi sbatte in home. Il toast porta con sé i
       //    propri dati (matchData/profile); se lo tocco, toastViewProfile/Accept/Reject
       //    impostano lo stato a partire dal toast (e fermano la ricerca con searchGen++).
-      showToast({
-        profile: fromProfile,
-        type: 'match',
-        matchData: req
-      });
+      // Strato 2: se ne sto già valutando una, questa entra in CODA (niente sovrascrittura).
+      enqueueOrShowRequest(fromProfile, req);
     })
     .on('postgres_changes', {
       event: 'UPDATE',
@@ -5695,7 +6353,9 @@ async function subscribeToMatches() {
         }
         handleMyMatchPhotoRequested();
       } else if (req.status === 'rejected' || req.status === 'expired') {
-        endMatchFlow(req.status);
+        // ✅ Solo se è la richiesta che sto seguendo ora: senza questa guardia, una mia
+        //    vecchia richiesta uscente che scade interrompeva un ALTRO flusso in corso.
+        if (currentMatch && currentMatch.id === req.id) endMatchFlow(req.status);
       }
     })
     // ✅ Caso speculare: sono io il DESTINATARIO (to_user) e l'altro (che ha iniziato
@@ -5857,7 +6517,7 @@ function leaveChat() {
   // ✅ Azzera anche il timer di attesa-risposta: se restava attivo, scattava un
   //    falso "Tempo scaduto" dopo essere usciti/rientrati nella chat. (Fix #2b)
   if (waitingRespTimer) { clearInterval(waitingRespTimer); waitingRespTimer = null; }
-  navTo('waiting');
+  navTo('chats'); // ✅ la freccia indietro dalla chat torna alla LISTA CHAT, non in home
 }
 
 // Swipe a sinistra per uscire dalla chat (oltre al pulsante ← in alto)
@@ -5867,7 +6527,7 @@ function leaveChat() {
   let sx = 0, sy = 0, tracking = false;
   chat.addEventListener('touchstart', (e) => {
     // Non interferire con controlli interattivi (audio/slider/input/bottoni)
-    if (e.target.closest('input, button, audio, a, textarea, .send-btn, .chat-mic-btn, .chat-photo-btn, .bubble img')) { tracking = false; return; }
+    if (e.target.closest('input, button, audio, a, textarea, .send-btn, .chat-mic-btn, .chat-photo-btn, .bubble img, .voice-player')) { tracking = false; return; }
     const t = e.touches[0]; sx = t.clientX; sy = t.clientY; tracking = true;
   }, { passive: true });
   chat.addEventListener('touchend', (e) => {
