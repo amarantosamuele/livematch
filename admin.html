@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>LiveMatch — Admin</title>
+<title>Sxty — Admin</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{--bg:#0f1117;--surface:#171a23;--surface2:#1f232e;--accent:#ff4d6d;--green:#28c76f;--text:#f2f3f7;--text2:#9aa0ad;--border:rgba(255,255,255,0.08);}
@@ -101,7 +101,7 @@
         <option value="inactive">Inattivi da 7+ giorni</option>
         <option value="online">Online adesso</option>
       </select>
-      <label>Titolo</label><input id="bcTitle" maxlength="80" placeholder="Es: Novità su LiveMatch!"/>
+      <label>Titolo</label><input id="bcTitle" maxlength="80" placeholder="Es: Novità su Sxty!"/>
       <label>Testo</label><textarea id="bcBody" maxlength="200" placeholder="Es: Abbiamo aggiunto..."></textarea>
       <div style="margin-top:14px"><button id="bcBtn" onclick="sendBroadcast()">Invia a tutti</button></div>
       <div id="bcMsg" class="msg"></div>
@@ -237,10 +237,10 @@
 
   // Contatta un utente con una notifica push mirata (es. per chiedere info su una segnalazione).
   async function contactUser(id, name){
-    const msg = prompt(`Messaggio push da inviare a ${name||'questo utente'}:`, 'Ciao! Lo staff di LiveMatch vorrebbe chiederti alcune informazioni. Rispondi a questa email o scrivici.');
+    const msg = prompt(`Messaggio push da inviare a ${name||'questo utente'}:`, 'Ciao! Lo staff di Sxty vorrebbe chiederti alcune informazioni. Rispondi a questa email o scrivici.');
     if (!msg) return;
     try{
-      const j = await callBroadcast({ title:'LiveMatch · Staff', body: msg, user_id: id });
+      const j = await callBroadcast({ title:'Sxty · Staff', body: msg, user_id: id });
       alert(j.sent>0 ? '✓ Notifica inviata.' : 'Inviata, ma l\'utente non ha notifiche attive / nessun dispositivo.');
     }catch(e){ alert('Errore: '+(e.message||e)); }
   }
